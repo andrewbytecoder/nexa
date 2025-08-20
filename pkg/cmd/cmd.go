@@ -51,5 +51,4 @@ func Execute() {
 func cmdRegiste() {
 	rootCmd := GetNexaCommand()
 	rootCmd.AddCommand(version.GetVersionCmd())
-	rootCmd.AddCommand(NewCmdHttpstat())
 }
