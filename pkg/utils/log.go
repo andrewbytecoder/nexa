@@ -8,11 +8,6 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// Logger 是我们封装的日志对象
-type Logger struct {
-	*zap.Logger
-}
-
 // Option 是函数式选项类型
 type Option func(*loggerConfig)
 
@@ -143,7 +138,7 @@ func WithErrorPaths(paths ...string) Option {
 }
 
 // NewLogger 创建一个新的日志实例
-func NewLogger(opts ...Option) (*Logger, error) {
+func NewLogger(opts ...Option) (*zap.Logger, error) {
 	cfg := defaultConfig()
 
 	// 应用所有选项
@@ -191,11 +186,5 @@ func NewLogger(opts ...Option) (*Logger, error) {
 	// 构建 zap.Logger
 	zapLogger := zap.New(multiCore, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 
-	return &Logger{zapLogger}, nil
-}
-
-// Close 关闭日志（关闭 lumberjack 文件句柄）
-func (l *Logger) Close() error {
-	// zap.Logger 同步时会 flush 所有写入器
-	return l.Sync()
+	return zapLogger, nil
 }

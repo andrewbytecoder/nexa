@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/nexa/pkg/cmd/version"
+	"github.com/nexa/pkg/context"
 	"github.com/spf13/cobra"
 	"sync"
 )
@@ -45,10 +46,12 @@ func (n *NexaCommand) AddCommand(cmd []*cobra.Command) {
 
 func Execute() {
 	rootCmd := GetNexaCommand()
+	ctx := context.New()
+	cmdRegister(ctx)
 	cobra.CheckErr(rootCmd.cmd.Execute())
 }
 
-func cmdRegiste() {
+func cmdRegister(ctx *context.Context) {
 	rootCmd := GetNexaCommand()
 	rootCmd.AddCommand(version.GetVersionCmd())
 }
