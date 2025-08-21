@@ -1,11 +1,11 @@
 package version
 
 import (
-	"github.com/nexa/pkg/context"
+	"github.com/nexa/pkg/ctx"
 	"github.com/spf13/cobra"
 )
 
-func GetVersionCmd(ctx *context.Context) []*cobra.Command {
+func GetVersionCmd(ctx *ctx.Ctx) []*cobra.Command {
 	var cmds []*cobra.Command
 	cmds = append(cmds, newCmdVersion())
 
@@ -18,8 +18,8 @@ func newCmdVersion() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "version",
 		Short:   "Print the client and server version information",
-		Long:    "Print the client and server version information for the current context.",
-		Example: "Print the client and server versions for the current context kubectl version",
+		Long:    "Print the client and server version information for the current ctx.",
+		Example: "Print the client and server versions for the current ctx kubectl version",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},

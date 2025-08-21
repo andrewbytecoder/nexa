@@ -1,12 +1,13 @@
 package httpstat
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/pem"
 	"flag"
 	"fmt"
 	"github.com/fatih/color"
-	"github.com/nexa/pkg/context"
+	"github.com/nexa/pkg/ctx"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"io"
@@ -18,7 +19,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -26,22 +26,25 @@ import (
 )
 
 type HttpStat struct {
-	ctx    *context.Context
+	ctx    *ctx.Ctx
 	logger *zap.Logger
-}
+	// Command line flags.
+	httpMethod      string
+	postBody        string
+	followRedirects bool
+	onlyHeader      bool
+	insecure        bool
+	httpHeaders     headers
+	saveOutput      bool
+	outputFile      string
+	showVersion     bool
+	clientCertFile  string
+	fourOnly        bool
+	sixOnly         bool
 
-func GetVersionCmd(ctx *context.Context) []*cobra.Command {
-	var cmds []*cobra.Command
-	cmds = append(cmds, newCmdVersion())
-
-	return cmds
-}
-
-func New(ctx *context.Context) *HttpStat {
-	return &HttpStat{
-		ctx:    ctx,
-		logger: ctx.Logger(),
-	}
+	// number of redirects followed
+	redirectsFollowed int
+	args              []string
 }
 
 const (
@@ -65,56 +68,75 @@ const (
 		`                                                                 total:%s` + "\n"
 )
 
-var (
-	// Command line flags.
-	httpMethod      string
-	postBody        string
-	followRedirects bool
-	onlyHeader      bool
-	insecure        bool
-	httpHeaders     headers
-	saveOutput      bool
-	outputFile      string
-	showVersion     bool
-	clientCertFile  string
-	fourOnly        bool
-	sixOnly         bool
-
-	// number of redirects followed
-	redirectsFollowed int
-
-	version = "devel" // for -v flag, updated during the release process with -ldflags=-X=main.version=...
-)
-
 const maxRedirects = 10
 
-func init() {
-	flag.StringVar(&httpMethod, "X", "GET", "HTTP method to use")
-	flag.StringVar(&postBody, "d", "", "the body of a POST or PUT request; from file use @filename")
-	flag.BoolVar(&followRedirects, "L", false, "follow 30x redirects")
-	flag.BoolVar(&onlyHeader, "I", false, "don't read body of request")
-	flag.BoolVar(&insecure, "k", false, "allow insecure SSL connections")
-	flag.Var(&httpHeaders, "H", "set HTTP header; repeatable: -H 'Accept: ...' -H 'Range: ...'")
-	flag.BoolVar(&saveOutput, "O", false, "save body as remote filename")
-	flag.StringVar(&outputFile, "o", "", "output file for body")
-	flag.BoolVar(&showVersion, "v", false, "print version number")
-	flag.StringVar(&clientCertFile, "E", "", "client cert file for tls config")
-	flag.BoolVar(&fourOnly, "4", false, "resolve IPv4 addresses only")
-	flag.BoolVar(&sixOnly, "6", false, "resolve IPv6 addresses only")
+func GetHttpCmd(ctx *ctx.Ctx) []*cobra.Command {
+	var cmds []*cobra.Command
+	cmds = append(cmds, newCmdHttpStat(ctx))
 
-	flag.Usage = usage
+	return cmds
 }
 
-func usage() {
-	fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS] URL\n\n", os.Args[0])
-	fmt.Fprintln(os.Stderr, "OPTIONS:")
+func newHttpStat(ctx *ctx.Ctx) *HttpStat {
+	return &HttpStat{
+		ctx:             ctx,
+		logger:          ctx.Logger(),
+		httpMethod:      "GET",
+		postBody:        "",
+		followRedirects: false,
+		onlyHeader:      false,
+		insecure:        false,
+		httpHeaders:     headers{},
+		saveOutput:      false,
+		outputFile:      "",
+		showVersion:     false,
+		clientCertFile:  "",
+	}
+}
+
+// newCmdVersion returns a cobra command for fetching versions
+func newCmdHttpStat(ctx *ctx.Ctx) *cobra.Command {
+	httpStat := newHttpStat(ctx)
+	cmd := &cobra.Command{
+		Use:     "httpstat",
+		Short:   "Print the client and server version information",
+		Long:    "Print the client and server version information for the current ctx.",
+		Example: "Print the client and server versions for the current ctx kubectl version",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(args)
+			httpStat.args = flag.Args()
+			httpStat.runHttpStat()
+		},
+	}
+
+	cmd.Flags().StringVarP(&httpStat.httpMethod, "request", "X", "GET", "HTTP method to use")
+	cmd.Flags().StringVarP(&httpStat.postBody, "body", "d", "", "the body of a POST or PUT request; from file use @filename")
+	cmd.Flags().BoolVar(&httpStat.followRedirects, "L", false, "follow 30x redirects")
+	cmd.Flags().BoolVar(&httpStat.onlyHeader, "I", false, "don't read body of request")
+	cmd.Flags().BoolVar(&httpStat.insecure, "k", false, "allow insecure SSL connections")
+	cmd.Flags().BoolVar(&httpStat.saveOutput, "O", false, "save body as remote filename")
+	cmd.Flags().StringVar(&httpStat.outputFile, "o", "", "output file for body")
+	cmd.Flags().BoolVar(&httpStat.showVersion, "v", false, "print version number")
+	cmd.Flags().StringVar(&httpStat.clientCertFile, "E", "", "client cert file for tls config")
+	cmd.Flags().BoolVar(&httpStat.fourOnly, "4", false, "resolve IPv4 addresses only")
+	cmd.Flags().BoolVar(&httpStat.sixOnly, "6", false, "resolve IPv6 addresses only")
+	cmd.Flags().Var(&httpStat.httpHeaders, "H", "set HTTP header; repeatable: -H 'Accept: ...' -H 'Range: ...'")
+
+	flag.Usage = httpStat.usage
+
+	return cmd
+}
+
+func (httpStat *HttpStat) usage() {
+	_, _ = fmt.Fprintf(os.Stderr, "Usage: httpstat [OPTIONS] URL\n\n")
+	_, _ = fmt.Fprintln(os.Stderr, "OPTIONS:")
 	flag.PrintDefaults()
-	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "ENVIRONMENT:")
-	fmt.Fprintln(os.Stderr, "  HTTP_PROXY    proxy for HTTP requests; complete URL or HOST[:PORT]")
-	fmt.Fprintln(os.Stderr, "                used for HTTPS requests if HTTPS_PROXY undefined")
-	fmt.Fprintln(os.Stderr, "  HTTPS_PROXY   proxy for HTTPS requests; complete URL or HOST[:PORT]")
-	fmt.Fprintln(os.Stderr, "  NO_PROXY      comma-separated list of hosts to exclude from proxy")
+	_, _ = fmt.Fprintln(os.Stderr, "")
+	_, _ = fmt.Fprintln(os.Stderr, "ENVIRONMENT:")
+	_, _ = fmt.Fprintln(os.Stderr, "  HTTP_PROXY    proxy for HTTP requests; complete URL or HOST[:PORT]")
+	_, _ = fmt.Fprintln(os.Stderr, "                used for HTTPS requests if HTTPS_PROXY undefined")
+	_, _ = fmt.Fprintln(os.Stderr, "  HTTPS_PROXY   proxy for HTTPS requests; complete URL or HOST[:PORT]")
+	_, _ = fmt.Fprintln(os.Stderr, "  NO_PROXY      comma-separated list of hosts to exclude from proxy")
 }
 
 func printf(format string, a ...interface{}) (n int, err error) {
@@ -125,16 +147,11 @@ func grayscale(code color.Attribute) func(string, ...interface{}) string {
 	return color.New(code + 232).SprintfFunc()
 }
 
-func main() {
+func (httpStat *HttpStat) runHttpStat() {
 	flag.Parse()
 
-	if showVersion {
-		fmt.Printf("%s %s (runtime: %s)\n", os.Args[0], version, runtime.Version())
-		os.Exit(0)
-	}
-
-	if fourOnly && sixOnly {
-		fmt.Fprintf(os.Stderr, "%s: Only one of -4 and -6 may be specified\n", os.Args[0])
+	if httpStat.fourOnly && httpStat.sixOnly {
+		_, _ = fmt.Fprintf(os.Stderr, "%s: Only one of -4 and -6 may be specified\n", os.Args[0])
 		os.Exit(-1)
 	}
 
@@ -144,17 +161,17 @@ func main() {
 		os.Exit(2)
 	}
 
-	if (httpMethod == "POST" || httpMethod == "PUT") && postBody == "" {
+	if (httpStat.httpMethod == "POST" || httpStat.httpMethod == "PUT") && httpStat.postBody == "" {
 		log.Fatal("must supply post body using -d when POST or PUT is used")
 	}
 
-	if onlyHeader {
-		httpMethod = "HEAD"
+	if httpStat.onlyHeader {
+		httpStat.httpMethod = "HEAD"
 	}
 
-	url := parseURL(args[0])
+	httpUrl := parseURL(args[0])
 
-	visit(url)
+	httpStat.visit(httpUrl)
 }
 
 // readClientCert - helper function to read client certificate
@@ -201,18 +218,18 @@ func parseURL(uri string) *url.URL {
 		uri = "//" + uri
 	}
 
-	url, err := url.Parse(uri)
+	httpUrl, err := url.Parse(uri)
 	if err != nil {
 		log.Fatalf("could not parse url %q: %v", uri, err)
 	}
 
-	if url.Scheme == "" {
-		url.Scheme = "http"
-		if !strings.HasSuffix(url.Host, ":80") {
-			url.Scheme += "s"
+	if httpUrl.Scheme == "" {
+		httpUrl.Scheme = "http"
+		if !strings.HasSuffix(httpUrl.Host, ":80") {
+			httpUrl.Scheme += "s"
 		}
 	}
-	return url
+	return httpUrl
 }
 
 func headerKeyValue(h string) (string, string) {
@@ -235,8 +252,8 @@ func dialContext(network string) func(ctx context.Context, network, addr string)
 
 // visit visits a url and times the interaction.
 // If the response is a 30x, visit follows the redirect.
-func visit(url *url.URL) {
-	req := newRequest(httpMethod, url, postBody)
+func (httpStat *HttpStat) visit(url *url.URL) {
+	req := httpStat.newRequest(httpStat.httpMethod, url, httpStat.postBody)
 
 	var t0, t1, t2, t3, t4, t5, t6 time.Time
 
@@ -255,14 +272,14 @@ func visit(url *url.URL) {
 			}
 			t2 = time.Now()
 
-			printf("\n%s%s\n", color.GreenString("Connected to "), color.CyanString(addr))
+			_, _ = printf("\n%s%s\n", color.GreenString("Connected to "), color.CyanString(addr))
 		},
 		GotConn:              func(_ httptrace.GotConnInfo) { t3 = time.Now() },
 		GotFirstResponseByte: func() { t4 = time.Now() },
 		TLSHandshakeStart:    func() { t5 = time.Now() },
 		TLSHandshakeDone:     func(_ tls.ConnectionState, _ error) { t6 = time.Now() },
 	}
-	req = req.WithContext(httptrace.WithClientTrace(context.Background(), trace))
+	req = req.WithContext(httptrace.WithClientTrace(httpStat.ctx.Context(), trace))
 
 	tr := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
@@ -274,9 +291,9 @@ func visit(url *url.URL) {
 	}
 
 	switch {
-	case fourOnly:
+	case httpStat.fourOnly:
 		tr.DialContext = dialContext("tcp4")
-	case sixOnly:
+	case httpStat.sixOnly:
 		tr.DialContext = dialContext("tcp6")
 	}
 
@@ -289,8 +306,8 @@ func visit(url *url.URL) {
 
 		tr.TLSClientConfig = &tls.Config{
 			ServerName:         host,
-			InsecureSkipVerify: insecure,
-			Certificates:       readClientCert(clientCertFile),
+			InsecureSkipVerify: httpStat.insecure,
+			Certificates:       readClientCert(httpStat.clientCertFile),
 			MinVersion:         tls.VersionTLS12,
 		}
 	}
@@ -319,9 +336,9 @@ func visit(url *url.URL) {
 			connectedVia = "TLSv1.3"
 		}
 	}
-	printf("\n%s %s\n", color.GreenString("Connected via"), color.CyanString("%s", connectedVia))
+	_, _ = printf("\n%s %s\n", color.GreenString("Connected via"), color.CyanString("%s", connectedVia))
 
-	bodyMsg := readResponseBody(req, resp)
+	bodyMsg := httpStat.readResponseBody(req, resp)
 	resp.Body.Close()
 
 	t7 := time.Now() // after read body
@@ -331,7 +348,7 @@ func visit(url *url.URL) {
 	}
 
 	// print status line and headers
-	printf("\n%s%s%s\n", color.GreenString("HTTP"), grayscale(14)("/"), color.CyanString("%d.%d %s", resp.ProtoMajor, resp.ProtoMinor, resp.Status))
+	_, _ = printf("\n%s%s%s\n", color.GreenString("HTTP"), grayscale(14)("/"), color.CyanString("%d.%d %s", resp.ProtoMajor, resp.ProtoMinor, resp.Status))
 
 	names := make([]string, 0, len(resp.Header))
 	for k := range resp.Header {
@@ -339,11 +356,11 @@ func visit(url *url.URL) {
 	}
 	sort.Sort(headers(names))
 	for _, k := range names {
-		printf("%s %s\n", grayscale(14)(k+":"), color.CyanString(strings.Join(resp.Header[k], ",")))
+		_, _ = printf("%s %s\n", grayscale(14)(k+":"), color.CyanString(strings.Join(resp.Header[k], ",")))
 	}
 
 	if bodyMsg != "" {
-		printf("\n%s\n", bodyMsg)
+		_, _ = printf("\n%s\n", bodyMsg)
 	}
 
 	fmta := func(d time.Duration) string {
@@ -364,7 +381,7 @@ func visit(url *url.URL) {
 
 	switch url.Scheme {
 	case "https":
-		printf(colorize(httpsTemplate),
+		_, _ = printf(colorize(httpsTemplate),
 			fmta(t1.Sub(t0)), // dns lookup
 			fmta(t2.Sub(t1)), // tcp connection
 			fmta(t6.Sub(t5)), // tls handshake
@@ -377,7 +394,7 @@ func visit(url *url.URL) {
 			fmtb(t7.Sub(t0)), // total
 		)
 	case "http":
-		printf(colorize(httpTemplate),
+		_, _ = printf(colorize(httpTemplate),
 			fmta(t1.Sub(t0)), // dns lookup
 			fmta(t3.Sub(t1)), // tcp connection
 			fmta(t4.Sub(t3)), // server processing
@@ -389,7 +406,7 @@ func visit(url *url.URL) {
 		)
 	}
 
-	if followRedirects && isRedirect(resp) {
+	if httpStat.followRedirects && isRedirect(resp) {
 		loc, err := resp.Location()
 		if err != nil {
 			if err == http.ErrNoLocation {
@@ -399,12 +416,12 @@ func visit(url *url.URL) {
 			log.Fatalf("unable to follow redirect: %v", err)
 		}
 
-		redirectsFollowed++
-		if redirectsFollowed > maxRedirects {
+		httpStat.redirectsFollowed++
+		if httpStat.redirectsFollowed > maxRedirects {
 			log.Fatalf("maximum number of redirects (%d) followed", maxRedirects)
 		}
 
-		visit(loc)
+		httpStat.visit(loc)
 	}
 }
 
@@ -412,12 +429,12 @@ func isRedirect(resp *http.Response) bool {
 	return resp.StatusCode > 299 && resp.StatusCode < 400
 }
 
-func newRequest(method string, url *url.URL, body string) *http.Request {
+func (httpStat *HttpStat) newRequest(method string, url *url.URL, body string) *http.Request {
 	req, err := http.NewRequest(method, url.String(), createBody(body))
 	if err != nil {
 		log.Fatalf("unable to create request: %v", err)
 	}
-	for _, h := range httpHeaders {
+	for _, h := range httpStat.httpHeaders {
 		k, v := headerKeyValue(h)
 		if strings.EqualFold(k, "host") {
 			req.Host = v
@@ -466,7 +483,7 @@ func getFilenameFromHeaders(headers http.Header) string {
 // readResponseBody consumes the body of the response.
 // readResponseBody returns an informational message about the
 // disposition of the response body's contents.
-func readResponseBody(req *http.Request, resp *http.Response) string {
+func (httpStat *HttpStat) readResponseBody(req *http.Request, resp *http.Response) string {
 	if isRedirect(resp) || req.Method == http.MethodHead {
 		return ""
 	}
@@ -474,10 +491,10 @@ func readResponseBody(req *http.Request, resp *http.Response) string {
 	w := io.Discard
 	msg := color.CyanString("Body discarded")
 
-	if saveOutput || outputFile != "" {
-		filename := outputFile
+	if httpStat.saveOutput || httpStat.outputFile != "" {
+		filename := httpStat.outputFile
 
-		if saveOutput {
+		if httpStat.saveOutput {
 			// try to get the filename from the Content-Disposition header
 			// otherwise fall back to the RequestURI
 			if filename = getFilenameFromHeaders(resp.Header); filename == "" {
@@ -520,6 +537,9 @@ func (h *headers) Set(v string) error {
 	return nil
 }
 
+func (h *headers) Type() string {
+	return "stringArray"
+}
 func (h headers) Len() int      { return len(h) }
 func (h headers) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
 func (h headers) Less(i, j int) bool {
