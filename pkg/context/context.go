@@ -16,3 +16,7 @@ func New() *Context {
 	}
 	return &Context{log: log}
 }
+
+func (c *Context) Logger() *zap.Logger {
+	return c.log
+}

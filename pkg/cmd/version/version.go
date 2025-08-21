@@ -1,8 +1,11 @@
 package version
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/nexa/pkg/context"
+	"github.com/spf13/cobra"
+)
 
-func GetVersionCmd() []*cobra.Command {
+func GetVersionCmd(ctx *context.Context) []*cobra.Command {
 	var cmds []*cobra.Command
 	cmds = append(cmds, newCmdVersion())
 
