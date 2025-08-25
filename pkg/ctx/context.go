@@ -7,8 +7,9 @@ import (
 )
 
 type Ctx struct {
-	ctx context.Context
-	log *zap.Logger
+	ctx    context.Context
+	log    *zap.Logger
+	cancel context.CancelFunc
 }
 
 func New() *Ctx {
@@ -16,7 +17,14 @@ func New() *Ctx {
 	if err != nil {
 		panic(err)
 	}
-	return &Ctx{log: log}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	return &Ctx{
+		log:    log,
+		ctx:    ctx,
+		cancel: cancel,
+	}
 }
 
 func (c *Ctx) Logger() *zap.Logger {

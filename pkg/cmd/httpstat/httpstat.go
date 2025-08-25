@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/pem"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/fatih/color"
@@ -89,7 +90,6 @@ func newHttpStat(ctx *ctx.Ctx) *HttpStat {
 		httpHeaders:     headers{},
 		saveOutput:      false,
 		outputFile:      "",
-		showVersion:     false,
 		clientCertFile:  "",
 	}
 }
@@ -103,24 +103,21 @@ func newCmdHttpStat(ctx *ctx.Ctx) *cobra.Command {
 		Long:    "Print the client and server version information for the current ctx.",
 		Example: "Print the client and server versions for the current ctx kubectl version",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(args)
-			httpStat.args = flag.Args()
-			httpStat.runHttpStat()
+			httpStat.runHttpStat(args[0])
 		},
 	}
 
 	cmd.Flags().StringVarP(&httpStat.httpMethod, "request", "X", "GET", "HTTP method to use")
 	cmd.Flags().StringVarP(&httpStat.postBody, "body", "d", "", "the body of a POST or PUT request; from file use @filename")
-	cmd.Flags().BoolVar(&httpStat.followRedirects, "L", false, "follow 30x redirects")
-	cmd.Flags().BoolVar(&httpStat.onlyHeader, "I", false, "don't read body of request")
-	cmd.Flags().BoolVar(&httpStat.insecure, "k", false, "allow insecure SSL connections")
-	cmd.Flags().BoolVar(&httpStat.saveOutput, "O", false, "save body as remote filename")
-	cmd.Flags().StringVar(&httpStat.outputFile, "o", "", "output file for body")
-	cmd.Flags().BoolVar(&httpStat.showVersion, "v", false, "print version number")
-	cmd.Flags().StringVar(&httpStat.clientCertFile, "E", "", "client cert file for tls config")
-	cmd.Flags().BoolVar(&httpStat.fourOnly, "4", false, "resolve IPv4 addresses only")
-	cmd.Flags().BoolVar(&httpStat.sixOnly, "6", false, "resolve IPv6 addresses only")
-	cmd.Flags().Var(&httpStat.httpHeaders, "H", "set HTTP header; repeatable: -H 'Accept: ...' -H 'Range: ...'")
+	cmd.Flags().BoolVarP(&httpStat.followRedirects, "redirects", "L", false, "follow 30x redirects")
+	cmd.Flags().BoolVarP(&httpStat.onlyHeader, "readRequest", "I", false, "don't read body of request")
+	cmd.Flags().BoolVarP(&httpStat.insecure, "ssl", "k", false, "allow insecure SSL connections")
+	cmd.Flags().BoolVarP(&httpStat.saveOutput, "output", "O", false, "save body as remote filename")
+	cmd.Flags().StringVarP(&httpStat.outputFile, "save", "o", "", "output file for body")
+	cmd.Flags().StringVarP(&httpStat.clientCertFile, "cert", "E", "", "client cert file for tls config")
+	cmd.Flags().BoolVarP(&httpStat.fourOnly, "ipv4", "4", false, "resolve IPv4 addresses only")
+	cmd.Flags().BoolVarP(&httpStat.sixOnly, "ipv6", "6", false, "resolve IPv6 addresses only")
+	cmd.Flags().VarP(&httpStat.httpHeaders, "header", "H", "set HTTP header; repeatable: -H 'Accept: ...' -H 'Range: ...'")
 
 	flag.Usage = httpStat.usage
 
@@ -147,18 +144,12 @@ func grayscale(code color.Attribute) func(string, ...interface{}) string {
 	return color.New(code + 232).SprintfFunc()
 }
 
-func (httpStat *HttpStat) runHttpStat() {
+func (httpStat *HttpStat) runHttpStat(uri string) {
 	flag.Parse()
 
 	if httpStat.fourOnly && httpStat.sixOnly {
 		_, _ = fmt.Fprintf(os.Stderr, "%s: Only one of -4 and -6 may be specified\n", os.Args[0])
 		os.Exit(-1)
-	}
-
-	args := flag.Args()
-	if len(args) != 1 {
-		flag.Usage()
-		os.Exit(2)
 	}
 
 	if (httpStat.httpMethod == "POST" || httpStat.httpMethod == "PUT") && httpStat.postBody == "" {
@@ -169,7 +160,7 @@ func (httpStat *HttpStat) runHttpStat() {
 		httpStat.httpMethod = "HEAD"
 	}
 
-	httpUrl := parseURL(args[0])
+	httpUrl := parseURL(uri)
 
 	httpStat.visit(httpUrl)
 }
@@ -409,7 +400,7 @@ func (httpStat *HttpStat) visit(url *url.URL) {
 	if httpStat.followRedirects && isRedirect(resp) {
 		loc, err := resp.Location()
 		if err != nil {
-			if err == http.ErrNoLocation {
+			if errors.Is(err, http.ErrNoLocation) {
 				// 30x but no Location to follow, give up.
 				return
 			}
