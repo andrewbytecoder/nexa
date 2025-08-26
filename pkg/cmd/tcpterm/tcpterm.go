@@ -31,6 +31,6 @@ func newCmdTcpTerm(ctx *ctx.Ctx) *cobra.Command {
 		tcpTerm.RunTcpTerm()
 	}
 
-	tcpterml.ParseFlags(cmd)
+	tcpTerm.ParseFlags(cmd)
 	return cmd
 }
