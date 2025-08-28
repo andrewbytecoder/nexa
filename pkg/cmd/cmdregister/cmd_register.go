@@ -2,7 +2,7 @@ package cmdregister
 
 import (
 	"github.com/nexa/pkg/cmd/httpstat"
-	"github.com/nexa/pkg/cmd/tcpterm"
+	"github.com/nexa/pkg/cmd/psutil"
 	"github.com/nexa/pkg/cmd/version"
 	"github.com/nexa/pkg/ctx"
 	"github.com/spf13/cobra"
@@ -52,7 +52,7 @@ func (n *NexaCommand) AddCommand(cmd []*cobra.Command) *NexaCommand {
 
 func (n *NexaCommand) RegisterCmd(ctx *ctx.Ctx) {
 	n.AddCommand(httpstat.GetHttpCmd(ctx))
-	n.AddCommand(tcpterm.GetTcpTermCmd(ctx))
+	n.AddCommand(psutil.GetPsUtilCmd(ctx))
 	n.AddCommand(version.GetVersionCmd(ctx))
 
 	for _, v := range n.cmdList {

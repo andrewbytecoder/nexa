@@ -1,0 +1,65 @@
+package psutil
+
+import (
+	"github.com/nexa/pkg/ctx"
+	psutil "github.com/nexa/pkg/net/psutil"
+	"github.com/spf13/cobra"
+)
+
+func GetPsUtilCmd(ctx *ctx.Ctx) []*cobra.Command {
+	var cmds []*cobra.Command
+	cmds = append(cmds, newCmd(ctx))
+
+	return cmds
+}
+
+// newCmdTcpTerm returns a cobra command for fetching versions
+func newCmd(ctx *ctx.Ctx) *cobra.Command {
+	psUtil := psutil.NewPsutil(ctx)
+
+	cmd := &cobra.Command{
+		Use:     "psutil",
+		Short:   "psutil ps for human",
+		Long:    `nexa psutil [command].`,
+		Example: `nexa psutil memory"`,
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 0 {
+				cmd.Help()
+				return
+			}
+		},
+	}
+
+	psUtil.ParseFlags(cmd)
+
+	addSubCmd(psUtil, cmd)
+
+	return cmd
+}
+
+func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
+	memCmd := &cobra.Command{
+		Use:     "memory",
+		Short:   "psutil memory",
+		Long:    `psutil memory [global options] command [command options] [arguments...].`,
+		Example: `nexa psutil memory -H=true"`,
+		Run: func(cmd *cobra.Command, args []string) {
+			psUtil.GetMemoryHandler().GetMemInfo()
+		},
+	}
+	cmd.AddCommand(memCmd)
+
+	psUtil.GetMemoryHandler().ParseFlags(memCmd)
+
+	cpuCmd := &cobra.Command{
+		Use:     "cpu",
+		Short:   "psutil cpu",
+		Long:    `psutil cpu [global options] command [command options] [arguments...].`,
+		Example: `nexa psutil cpu -H=true"`,
+		Run: func(cmd *cobra.Command, args []string) {
+			psUtil.GetCpuHandler().GetCpuInfo()
+		},
+	}
+	cmd.AddCommand(cpuCmd)
+	psUtil.GetCpuHandler().ParseFlags(cpuCmd)
+}
