@@ -18,6 +18,7 @@ const (
 	tSwapDev   = "swapDev"
 	tUserStat  = "userStat"
 	tLoadAvg   = "loadAvg"
+	tLoadMisc  = "loadMisc"
 )
 
 type PsUtil struct {
