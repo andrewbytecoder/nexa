@@ -238,6 +238,7 @@ func (httpStat *HttpStat) visit(url *url.URL) {
 	}
 	req = req.WithContext(httptrace.WithClientTrace(httpStat.ctx.Context(), trace))
 
+	req.Header.Add("Accept", "*/*")
 	tr := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		MaxIdleConns:          100,
@@ -277,7 +278,7 @@ func (httpStat *HttpStat) visit(url *url.URL) {
 			return http.ErrUseLastResponse
 		},
 	}
-
+	fmt.Println("GET ", req.Header)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatalf("failed to read response: %v", err)
@@ -445,7 +446,7 @@ func (httpStat *HttpStat) readResponseBody(req *http.Request, resp *http.Respons
 		return ""
 	}
 
-	w := io.Discard
+	w := os.Stdout
 	msg := color.CyanString("Body discarded")
 
 	if httpStat.saveOutput || httpStat.outputFile != "" {

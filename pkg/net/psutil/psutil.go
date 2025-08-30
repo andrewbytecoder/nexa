@@ -10,8 +10,9 @@ type PsUtil struct {
 	ctx    *ctx.Ctx
 	logger *zap.Logger
 
-	psMem *PsMem // 内存信息
-	psCpu *PsCpu
+	psMem  *PsMem // 内存信息
+	psCpu  *PsCpu
+	psDisk *PsDisk
 
 	// Command line flags.
 
@@ -25,6 +26,7 @@ func NewPsutil(ctx *ctx.Ctx) *PsUtil {
 	// 创建内存信息对象
 	psUtil.psMem = NewPsMem(psUtil)
 	psUtil.psCpu = NewPsCpu(psUtil)
+	psUtil.psDisk = NewPsDisk(psUtil)
 
 	return psUtil
 }
@@ -35,6 +37,10 @@ func (psUtil *PsUtil) GetMemoryHandler() *PsMem {
 
 func (psUtil *PsUtil) GetCpuHandler() *PsCpu {
 	return psUtil.psCpu
+}
+
+func (psUtil *PsUtil) GetDiskHandler() *PsDisk {
+	return psUtil.psDisk
 }
 
 func (psUtil *PsUtil) ParseFlags(cmd *cobra.Command) {

@@ -38,6 +38,7 @@ func newCmd(ctx *ctx.Ctx) *cobra.Command {
 }
 
 func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
+	// 内存使用情况统计
 	memCmd := &cobra.Command{
 		Use:     "memory",
 		Short:   "psutil memory",
@@ -50,7 +51,7 @@ func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
 	cmd.AddCommand(memCmd)
 
 	psUtil.GetMemoryHandler().ParseFlags(memCmd)
-
+	// cpu使用情况统计
 	cpuCmd := &cobra.Command{
 		Use:     "cpu",
 		Short:   "psutil cpu",
@@ -62,4 +63,18 @@ func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
 	}
 	cmd.AddCommand(cpuCmd)
 	psUtil.GetCpuHandler().ParseFlags(cpuCmd)
+
+	// 磁盘使用情况统计
+	diskCmd := &cobra.Command{
+		Use:     "disk",
+		Short:   "psutil disk",
+		Long:    `psutil disk [global options] command [command options] [arguments...].`,
+		Example: `nexa psutil disk"`,
+		Run: func(cmd *cobra.Command, args []string) {
+			psUtil.GetDiskHandler().GetDiskInfo()
+		},
+	}
+	cmd.AddCommand(diskCmd)
+	psUtil.GetDiskHandler().ParseFlags(diskCmd)
+
 }
