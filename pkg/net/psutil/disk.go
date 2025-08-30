@@ -2,6 +2,7 @@ package psutil
 
 import (
 	"fmt"
+	"github.com/olekukonko/tablewriter"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -29,14 +30,15 @@ func NewPsDisk(psUtil *PsUtil) *PsDisk {
 }
 
 const (
-	tUsage = "usage"
+	tUsage     = "usage"
+	tIOCounter = "IOCounter"
 )
 
 func (psDisk *PsDisk) ParseFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&psDisk.readable, "human-readable", "H", true, "human readable output")
-	cmd.Flags().StringVarP(&psDisk.showType, "type", "t", "all", strings.Join([]string{tAll, tUsage, tInfo}, "|"))
-	cmd.Flags().StringVarP(&psDisk.usagePath, "usage-path", "u", "", "default all usage path")
-	cmd.Flags().BoolVarP(&psDisk.allPartitions, "all", "a", false, "default false")
+	cmd.Flags().StringVarP(&psDisk.showType, "type", "t", "all", strings.Join([]string{tAll, tUsage, tIOCounter}, "|"))
+	cmd.Flags().StringVarP(&psDisk.usagePath, "path", "u", "", "if not set depend on -a")
+	cmd.Flags().BoolVarP(&psDisk.allPartitions, "all", "a", true, "all partitions")
 }
 
 func (psDisk *PsDisk) GetDiskInfo() {
@@ -44,9 +46,9 @@ func (psDisk *PsDisk) GetDiskInfo() {
 		psDisk.ShowUsage()
 	}
 
-	if psDisk.showType == tAll || psDisk.showType == tInfo {
+	if psDisk.showType == tAll || psDisk.showType == tIOCounter {
+		psDisk.ShowIOCounter()
 	}
-
 }
 
 func (psDisk *PsDisk) ShowUsage() {
@@ -58,8 +60,7 @@ func (psDisk *PsDisk) ShowUsage() {
 			Mountpoint: psDisk.usagePath,
 		})
 	}
-
-	usages := make([]*disk.UsageStat, 0)
+	mapUsage := make(map[string]*disk.UsageStat)
 	for _, partitionStat := range allPartitionStat {
 		if true == shouldSkipMount(partitionStat.Mountpoint, partitionStat.Fstype) {
 			continue
@@ -69,14 +70,80 @@ func (psDisk *PsDisk) ShowUsage() {
 			psDisk.psUtil.logger.Error("disk.Usage", zap.Error(err))
 			continue
 		}
-		usages = append(usages, usage)
+		mapUsage[partitionStat.Mountpoint] = usage
 	}
 
-	err := PrintDiskUsageTable(usages)
+	err := PrintDiskUsageTable(mapUsage)
 	if err != nil {
 		psDisk.psUtil.logger.Error("PrintDiskUsageTable", zap.Error(err))
 		return
 	}
+}
+
+func (psDisk *PsDisk) ShowIOCounter() {
+	allPartitionStat := make([]disk.PartitionStat, 0)
+	if psDisk.usagePath == "" {
+		allPartitionStat, _ = disk.Partitions(psDisk.allPartitions)
+	} else {
+		allPartitionStat = append(allPartitionStat, disk.PartitionStat{
+			Mountpoint: psDisk.usagePath,
+		})
+	}
+	var devices []string
+	for _, partitionStat := range allPartitionStat {
+		if true == shouldSkipMount(partitionStat.Mountpoint, partitionStat.Fstype) {
+			continue
+		}
+		devices = append(devices, partitionStat.Device)
+	}
+	counters, err := disk.IOCounters(devices...)
+	if err != nil {
+		psDisk.psUtil.logger.Error("disk.IOCounters", zap.Error(err))
+		return
+	}
+	psDisk.PrintIOCounter(counters)
+}
+
+func (psDisk *PsDisk) PrintIOCounter(counters map[string]disk.IOCountersStat) {
+
+	table := tablewriter.NewWriter(os.Stdout)
+
+	// 设置表头：每个字段名作为一列
+	headers := []string{
+		"Name", "ReadCount", "MergedReadCount", "WriteCount", "MergedWriteCount",
+		"ReadBytes", "WriteBytes", "ReadTime", "WriteTime", "IopsInProgress",
+		"IoTime", "WeightedIO", "SerialNumber", "Label",
+	}
+	table.Header(headers)
+	for _, stat := range counters {
+		// 添加数据行：每个字段值对应一列
+		row := []string{
+			stat.Name,
+			fmt.Sprintf("%d", stat.ReadCount),
+			fmt.Sprintf("%d", stat.MergedReadCount),
+			fmt.Sprintf("%d", stat.WriteCount),
+			fmt.Sprintf("%d", stat.MergedWriteCount),
+			fmt.Sprintf("%d", stat.ReadBytes),
+			fmt.Sprintf("%d", stat.WriteBytes),
+			fmt.Sprintf("%d", stat.ReadTime),
+			fmt.Sprintf("%d", stat.WriteTime),
+			fmt.Sprintf("%d", stat.IopsInProgress),
+			fmt.Sprintf("%d", stat.IoTime),
+			fmt.Sprintf("%d", stat.WeightedIO),
+			stat.SerialNumber,
+			stat.Label,
+		}
+		err := table.Append(row)
+		if err != nil {
+			return
+		}
+	}
+	err := table.Render()
+	if err != nil {
+		psDisk.psUtil.logger.Error("table.Render", zap.Error(err))
+		return
+	}
+
 }
 
 func shouldSkipMount(mountpoint, fstype string) bool {
@@ -153,24 +220,24 @@ func humanInodes(n uint64) string {
 }
 
 // PrintDiskUsageTable 输出单个路径的磁盘使用情况表格
-func PrintDiskUsageTable(usages []*disk.UsageStat) error {
+func PrintDiskUsageTable(mapUsage map[string]*disk.UsageStat) error {
 
 	// 使用 tabwriter 实现对齐
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
 	// 表头
-	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		"Filesystem", "Type", "Size", "Used", "Avail", "Use%", "Inodes", "IUse%")
+	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		"Filesystem", "Type", "Size", "Used", "Avail", "Use%", "Inodes", "IUse%", "Mounted on")
 
 	// 分隔线
-	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 		strings.Repeat("-", 10), strings.Repeat("-", 8), strings.Repeat("-", 6),
 		strings.Repeat("-", 6), strings.Repeat("-", 6), strings.Repeat("-", 5),
-		strings.Repeat("-", 8), strings.Repeat("-", 6))
+		strings.Repeat("-", 8), strings.Repeat("-", 6), strings.Repeat("-", 12))
 
-	for _, usage := range usages {
+	for mountOn, usage := range mapUsage {
 		// 数据行
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%.1f%%\t%s\t%.1f%%\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%.1f%%\t%s\t%.1f%%\t%s\n",
 			usage.Fstype,                   // Filesystem（实际应为设备名，但 gopsutil 不直接提供）
 			usage.Fstype,                   // Type（文件系统类型）
 			humanSize(usage.Total),         // Size
@@ -179,7 +246,10 @@ func PrintDiskUsageTable(usages []*disk.UsageStat) error {
 			usage.UsedPercent,              // Use%
 			humanInodes(usage.InodesTotal), // Inodes
 			usage.InodesUsedPercent,        // IUse%
+			mountOn,                        // IUse%
 		)
+
+		fmt.Println("=============================path", usage.Path)
 	}
 
 	w.Flush()
