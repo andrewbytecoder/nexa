@@ -29,11 +29,6 @@ func NewPsDisk(psUtil *PsUtil) *PsDisk {
 	}
 }
 
-const (
-	tUsage     = "usage"
-	tIOCounter = "IOCounter"
-)
-
 func (psDisk *PsDisk) ParseFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&psDisk.readable, "human-readable", "H", true, "human readable output")
 	cmd.Flags().StringVarP(&psDisk.showType, "type", "t", "all", strings.Join([]string{tAll, tUsage, tIOCounter}, "|"))
@@ -43,15 +38,15 @@ func (psDisk *PsDisk) ParseFlags(cmd *cobra.Command) {
 
 func (psDisk *PsDisk) GetDiskInfo() {
 	if psDisk.showType == tAll || psDisk.showType == tUsage {
-		psDisk.ShowUsage()
+		psDisk.showUsage()
 	}
 
 	if psDisk.showType == tAll || psDisk.showType == tIOCounter {
-		psDisk.ShowIOCounter()
+		psDisk.showIOCounter()
 	}
 }
 
-func (psDisk *PsDisk) ShowUsage() {
+func (psDisk *PsDisk) showUsage() {
 	allPartitionStat := make([]disk.PartitionStat, 0)
 	if psDisk.usagePath == "" {
 		allPartitionStat, _ = disk.Partitions(psDisk.allPartitions)
@@ -73,14 +68,14 @@ func (psDisk *PsDisk) ShowUsage() {
 		mapUsage[partitionStat.Mountpoint] = usage
 	}
 
-	err := PrintDiskUsageTable(mapUsage)
+	err := printDiskUsageTable(mapUsage)
 	if err != nil {
-		psDisk.psUtil.logger.Error("PrintDiskUsageTable", zap.Error(err))
+		psDisk.psUtil.logger.Error("printDiskUsageTable", zap.Error(err))
 		return
 	}
 }
 
-func (psDisk *PsDisk) ShowIOCounter() {
+func (psDisk *PsDisk) showIOCounter() {
 	allPartitionStat := make([]disk.PartitionStat, 0)
 	if psDisk.usagePath == "" {
 		allPartitionStat, _ = disk.Partitions(psDisk.allPartitions)
@@ -101,10 +96,10 @@ func (psDisk *PsDisk) ShowIOCounter() {
 		psDisk.psUtil.logger.Error("disk.IOCounters", zap.Error(err))
 		return
 	}
-	psDisk.PrintIOCounter(counters)
+	psDisk.printIOCounter(counters)
 }
 
-func (psDisk *PsDisk) PrintIOCounter(counters map[string]disk.IOCountersStat) {
+func (psDisk *PsDisk) printIOCounter(counters map[string]disk.IOCountersStat) {
 
 	table := tablewriter.NewWriter(os.Stdout)
 
@@ -219,8 +214,8 @@ func humanInodes(n uint64) string {
 	return strconv.FormatUint(n, 10)
 }
 
-// PrintDiskUsageTable 输出单个路径的磁盘使用情况表格
-func PrintDiskUsageTable(mapUsage map[string]*disk.UsageStat) error {
+// printDiskUsageTable 输出单个路径的磁盘使用情况表格
+func printDiskUsageTable(mapUsage map[string]*disk.UsageStat) error {
 
 	// 使用 tabwriter 实现对齐
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
@@ -248,8 +243,6 @@ func PrintDiskUsageTable(mapUsage map[string]*disk.UsageStat) error {
 			usage.InodesUsedPercent,        // IUse%
 			mountOn,                        // IUse%
 		)
-
-		fmt.Println("=============================path", usage.Path)
 	}
 
 	w.Flush()

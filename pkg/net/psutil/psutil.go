@@ -6,6 +6,18 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	tAll       = "all"
+	tUsage     = "usage"
+	tIOCounter = "IOCounter"
+	tTimes     = "times"
+	tPercent   = "percent"
+	tInfo      = "info"
+	tMem       = "mem"
+	tSwap      = "swap"
+	tSwapDev   = "swapDev"
+)
+
 type PsUtil struct {
 	ctx    *ctx.Ctx
 	logger *zap.Logger
@@ -13,6 +25,7 @@ type PsUtil struct {
 	psMem  *PsMem // 内存信息
 	psCpu  *PsCpu
 	psDisk *PsDisk
+	psHost *PsHost
 
 	// Command line flags.
 
@@ -27,6 +40,7 @@ func NewPsutil(ctx *ctx.Ctx) *PsUtil {
 	psUtil.psMem = NewPsMem(psUtil)
 	psUtil.psCpu = NewPsCpu(psUtil)
 	psUtil.psDisk = NewPsDisk(psUtil)
+	psUtil.psHost = NewPsHost(psUtil)
 
 	return psUtil
 }
@@ -41,6 +55,9 @@ func (psUtil *PsUtil) GetCpuHandler() *PsCpu {
 
 func (psUtil *PsUtil) GetDiskHandler() *PsDisk {
 	return psUtil.psDisk
+}
+func (psUtil *PsUtil) GetHostHandler() *PsHost {
+	return psUtil.psHost
 }
 
 func (psUtil *PsUtil) ParseFlags(cmd *cobra.Command) {

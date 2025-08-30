@@ -29,12 +29,6 @@ func NewPsCpu(psUtil *PsUtil) *PsCpu {
 	}
 }
 
-const (
-	tTimes   = "times"
-	tPercent = "percent"
-	tInfo    = "info"
-)
-
 func (psCpu *PsCpu) ParseFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&psCpu.readable, "human-readable", "H", true, "human readable output")
 	cmd.Flags().StringVarP(&psCpu.showType, "type", "t", "all", strings.Join([]string{tAll, tTimes, tPercent, tInfo}, "|"))
@@ -44,29 +38,29 @@ func (psCpu *PsCpu) ParseFlags(cmd *cobra.Command) {
 
 func (psCpu *PsCpu) GetCpuInfo() {
 	if psCpu.showType == tAll || psCpu.showType == tTimes {
-		psCpu.ShowCpuTimes()
+		psCpu.showCpuTimes()
 	}
 
 	if psCpu.showType == tAll || psCpu.showType == tInfo {
-		psCpu.ShowCpuInfo()
+		psCpu.showCpuInfo()
 	}
 
 	if psCpu.showType == tAll || psCpu.showType == tPercent {
-		psCpu.ShowCpuPercent()
+		psCpu.showCpuPercent()
 	}
 }
 
-func (psCpu *PsCpu) ShowCpuTimes() {
+func (psCpu *PsCpu) showCpuTimes() {
 	times, err := cpu.Times(psCpu.perCpu)
 	if err != nil {
 		psCpu.psUtil.logger.Error("unable to get cpu times", zap.Error(err))
 		return
 	}
 
-	PrintCPUSummary(times)
+	printCPUSummary(times)
 }
 
-func (psCpu *PsCpu) ShowCpuPercent() {
+func (psCpu *PsCpu) showCpuPercent() {
 	percents, err := cpu.Percent(time.Second*1, psCpu.perCpu)
 	if err != nil {
 		psCpu.psUtil.logger.Error("unable to get cpu times", zap.Error(err))
@@ -77,27 +71,27 @@ func (psCpu *PsCpu) ShowCpuPercent() {
 	fmt.Println("------------------------------------------")
 
 	// 采样间隔 1 秒
-	timesPercent, err := GetCPUPercent(1 * time.Second)
+	timesPercent, err := getCPUPercent(1 * time.Second)
 	if err != nil {
 		psCpu.psUtil.logger.Error("unable to get cpu times", zap.Error(err))
 		os.Exit(1)
 	}
 
-	PrintCPUPercentTable(timesPercent)
+	printCPUPercentTable(timesPercent)
 }
 
-func (psCpu *PsCpu) ShowCpuInfo() {
+func (psCpu *PsCpu) showCpuInfo() {
 	times, err := cpu.Info()
 	if err != nil {
 		psCpu.psUtil.logger.Error("unable to get cpu info", zap.Error(err))
 		return
 	}
 
-	PrintCPUInfoTable(times)
+	printCPUInfoTable(times)
 }
 
-// PrintCPUSummary 将 []TimesStat 格式化输出为表格
-func PrintCPUSummary(stats []cpu.TimesStat) {
+// printCPUSummary 将 []TimesStat 格式化输出为表格
+func printCPUSummary(stats []cpu.TimesStat) {
 	w := tabwriter.NewWriter(os.Stdout, 10, 4, 3, ' ', 0)
 
 	// 表头
@@ -129,8 +123,8 @@ func PrintCPUSummary(stats []cpu.TimesStat) {
 	_ = w.Flush()
 }
 
-// PrintCPUInfoTable 美观输出 CPU 信息表格
-func PrintCPUInfoTable(info []cpu.InfoStat) {
+// printCPUInfoTable 美观输出 CPU 信息表格
+func printCPUInfoTable(info []cpu.InfoStat) {
 	// 使用空格作为分隔符，配合固定宽度控制对齐
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight|tabwriter.Debug)
 
@@ -209,8 +203,8 @@ type CPUPercentStat struct {
 	Total     float64 // 非空闲时间总和（User + System + ...）
 }
 
-// GetCPUPercent 获取每个 CPU 核心的使用率（%），类似 top
-func GetCPUPercent(interval time.Duration) ([]CPUPercentStat, error) {
+// getCPUPercent 获取每个 CPU 核心的使用率（%），类似 top
+func getCPUPercent(interval time.Duration) ([]CPUPercentStat, error) {
 	// 第一次采样
 	first, err := cpu.TimesWithContext(context.Background(), true)
 	if err != nil {
@@ -276,8 +270,8 @@ func GetCPUPercent(interval time.Duration) ([]CPUPercentStat, error) {
 	return result, nil
 }
 
-// PrintCPUPercentTable 输出表格
-func PrintCPUPercentTable(stats []CPUPercentStat) {
+// printCPUPercentTable 输出表格
+func printCPUPercentTable(stats []CPUPercentStat) {
 	w := tabwriter.NewWriter(os.Stdout, 10, 4, 3, ' ', 0)
 
 	_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",

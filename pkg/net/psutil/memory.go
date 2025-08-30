@@ -2,7 +2,6 @@ package psutil
 
 import (
 	"fmt"
-	"github.com/nexa/pkg/utils"
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/spf13/cobra"
 	"log"
@@ -23,13 +22,6 @@ func NewPsMem(psUtil *PsUtil) *PsMem {
 	}
 	return psMem
 }
-
-const (
-	tAll     = "all"
-	tMem     = "mem"
-	tSwap    = "swap"
-	tSwapDev = "swapDev"
-)
 
 func (psMem *PsMem) ParseFlags(cmd *cobra.Command) {
 	//  -h, --human-readable
@@ -62,33 +54,33 @@ func (psMem *PsMem) showMemInfo() {
 
 	fmt.Println("-----------------------------------------------------------------------")
 	if psMem.readable {
-		fmt.Println("Free : " + utils.HumanReadableBytesBinary(v.Free))
-		fmt.Println("Used : " + utils.HumanReadableBytesBinary(v.Used))
-		fmt.Println("Total : " + utils.HumanReadableBytesBinary(v.Total))
-		fmt.Println("UsedPercent : " + utils.HumanReadableBytesBinary(uint64(v.UsedPercent)))
-		fmt.Println("CommittedAS : " + utils.HumanReadableBytesBinary(v.CommittedAS))
-		fmt.Println("CommitLimit : " + utils.HumanReadableBytesBinary(v.CommitLimit))
-		fmt.Println("VmallocTotal : " + utils.HumanReadableBytesBinary(v.VmallocTotal))
-		fmt.Println("VmallocUsed : " + utils.HumanReadableBytesBinary(v.VmallocUsed))
-		fmt.Println("VmallocChunk : " + utils.HumanReadableBytesBinary(v.VmallocChunk))
-		fmt.Println("HighFree : " + utils.HumanReadableBytesBinary(v.HighFree))
-		fmt.Println("HighTotal : " + utils.HumanReadableBytesBinary(v.HighTotal))
-		fmt.Println("LowFree : " + utils.HumanReadableBytesBinary(v.LowFree))
-		fmt.Println("LowTotal : " + utils.HumanReadableBytesBinary(v.LowTotal))
-		fmt.Println("Mapped : " + utils.HumanReadableBytesBinary(v.Mapped))
-		fmt.Println("Slab : " + utils.HumanReadableBytesBinary(v.Slab))
-		fmt.Println("Sreclaimable : " + utils.HumanReadableBytesBinary(v.Sreclaimable))
-		fmt.Println("Sunreclaim : " + utils.HumanReadableBytesBinary(v.Sunreclaim))
-		fmt.Println("WriteBack : " + utils.HumanReadableBytesBinary(v.WriteBack))
-		fmt.Println("WriteBackTmp : " + utils.HumanReadableBytesBinary(v.WriteBackTmp))
-		fmt.Println("PageTables : " + utils.HumanReadableBytesBinary(v.PageTables))
-		fmt.Println("Shared : " + utils.HumanReadableBytesBinary(v.Shared))
-		fmt.Println("HugePagesFree : " + utils.HumanReadableBytesBinary(v.HugePagesFree))
-		fmt.Println("HugePagesRsvd : " + utils.HumanReadableBytesBinary(v.HugePagesRsvd))
-		fmt.Println("HugePagesSurp : " + utils.HumanReadableBytesBinary(v.HugePagesSurp))
-		fmt.Println("HugePagesTotal : " + utils.HumanReadableBytesBinary(v.HugePagesTotal))
-		fmt.Println("HugePageSize : " + utils.HumanReadableBytesBinary(v.HugePageSize))
-		fmt.Println("AnonHugePages : " + utils.HumanReadableBytesBinary(v.AnonHugePages))
+		fmt.Println("Free : " + HumanReadableBytesBinary(v.Free))
+		fmt.Println("Used : " + HumanReadableBytesBinary(v.Used))
+		fmt.Println("Total : " + HumanReadableBytesBinary(v.Total))
+		fmt.Println("UsedPercent : " + HumanReadableBytesBinary(uint64(v.UsedPercent)))
+		fmt.Println("CommittedAS : " + HumanReadableBytesBinary(v.CommittedAS))
+		fmt.Println("CommitLimit : " + HumanReadableBytesBinary(v.CommitLimit))
+		fmt.Println("VmallocTotal : " + HumanReadableBytesBinary(v.VmallocTotal))
+		fmt.Println("VmallocUsed : " + HumanReadableBytesBinary(v.VmallocUsed))
+		fmt.Println("VmallocChunk : " + HumanReadableBytesBinary(v.VmallocChunk))
+		fmt.Println("HighFree : " + HumanReadableBytesBinary(v.HighFree))
+		fmt.Println("HighTotal : " + HumanReadableBytesBinary(v.HighTotal))
+		fmt.Println("LowFree : " + HumanReadableBytesBinary(v.LowFree))
+		fmt.Println("LowTotal : " + HumanReadableBytesBinary(v.LowTotal))
+		fmt.Println("Mapped : " + HumanReadableBytesBinary(v.Mapped))
+		fmt.Println("Slab : " + HumanReadableBytesBinary(v.Slab))
+		fmt.Println("Sreclaimable : " + HumanReadableBytesBinary(v.Sreclaimable))
+		fmt.Println("Sunreclaim : " + HumanReadableBytesBinary(v.Sunreclaim))
+		fmt.Println("WriteBack : " + HumanReadableBytesBinary(v.WriteBack))
+		fmt.Println("WriteBackTmp : " + HumanReadableBytesBinary(v.WriteBackTmp))
+		fmt.Println("PageTables : " + HumanReadableBytesBinary(v.PageTables))
+		fmt.Println("Shared : " + HumanReadableBytesBinary(v.Shared))
+		fmt.Println("HugePagesFree : " + HumanReadableBytesBinary(v.HugePagesFree))
+		fmt.Println("HugePagesRsvd : " + HumanReadableBytesBinary(v.HugePagesRsvd))
+		fmt.Println("HugePagesSurp : " + HumanReadableBytesBinary(v.HugePagesSurp))
+		fmt.Println("HugePagesTotal : " + HumanReadableBytesBinary(v.HugePagesTotal))
+		fmt.Println("HugePageSize : " + HumanReadableBytesBinary(v.HugePageSize))
+		fmt.Println("AnonHugePages : " + HumanReadableBytesBinary(v.AnonHugePages))
 	} else {
 
 		fmt.Println(fmt.Sprintf("Free : %d", v.Free))
@@ -121,6 +113,19 @@ func (psMem *PsMem) showMemInfo() {
 	}
 }
 
+// HumanReadableBytesBinary 使用二进制单位（GiB, MiB）
+func HumanReadableBytesBinary(bytes uint64) string {
+	units := []string{"B", "KiB", "MiB", "GiB", "TiB"}
+	value := float64(bytes)
+	base := 1024.0
+	i := 0
+	for ; i < len(units)-1 && value >= base; i++ {
+		value /= base
+	}
+
+	return fmt.Sprintf("%.2f %s", value, units[i])
+}
+
 func (psMem *PsMem) showSwapDevInfo() {
 	fmt.Println("-----------------------------------------------------------------------")
 	s, err := mem.SwapDevices()
@@ -131,8 +136,8 @@ func (psMem *PsMem) showSwapDevInfo() {
 	for _, v := range s {
 		if psMem.readable {
 			fmt.Println(fmt.Sprintf("Device : %s", v.Name))
-			fmt.Println(fmt.Sprintf("Total : %s", utils.HumanReadableBytesBinary(v.UsedBytes)))
-			fmt.Println(fmt.Sprintf("Used : %s", utils.HumanReadableBytesBinary(v.UsedBytes)))
+			fmt.Println(fmt.Sprintf("Total : %s", HumanReadableBytesBinary(v.UsedBytes)))
+			fmt.Println(fmt.Sprintf("Used : %s", HumanReadableBytesBinary(v.UsedBytes)))
 		} else {
 			fmt.Println(fmt.Sprintf("Device : %s", v.Name))
 			fmt.Println(fmt.Sprintf("Total : %d", v.UsedBytes))
@@ -150,9 +155,9 @@ func (psMem *PsMem) showSwapInfo() {
 		return
 	}
 	if psMem.readable {
-		fmt.Println(fmt.Sprintf("Total : %s", utils.HumanReadableBytesBinary(s.Total)))
-		fmt.Println(fmt.Sprintf("Used : %s", utils.HumanReadableBytesBinary(s.Used)))
-		fmt.Println(fmt.Sprintf("Free : %s", utils.HumanReadableBytesBinary(s.Free)))
+		fmt.Println(fmt.Sprintf("Total : %s", HumanReadableBytesBinary(s.Total)))
+		fmt.Println(fmt.Sprintf("Used : %s", HumanReadableBytesBinary(s.Used)))
+		fmt.Println(fmt.Sprintf("Free : %s", HumanReadableBytesBinary(s.Free)))
 		fmt.Println(fmt.Sprintf("UsedPercent : %f", s.UsedPercent))
 		fmt.Println(fmt.Sprintf("Sin : %d", s.Sin))
 		fmt.Println(fmt.Sprintf("Sout : %d", s.Sout))
