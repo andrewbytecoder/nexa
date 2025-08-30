@@ -17,6 +17,7 @@ const (
 	tSwap      = "swap"
 	tSwapDev   = "swapDev"
 	tUserStat  = "userStat"
+	tLoadAvg   = "loadAvg"
 )
 
 type PsUtil struct {
@@ -27,9 +28,7 @@ type PsUtil struct {
 	psCpu  *PsCpu
 	psDisk *PsDisk
 	psHost *PsHost
-
-	// Command line flags.
-
+	psLoad *PsLoad
 }
 
 func NewPsutil(ctx *ctx.Ctx) *PsUtil {
@@ -42,6 +41,7 @@ func NewPsutil(ctx *ctx.Ctx) *PsUtil {
 	psUtil.psCpu = NewPsCpu(psUtil)
 	psUtil.psDisk = NewPsDisk(psUtil)
 	psUtil.psHost = NewPsHost(psUtil)
+	psUtil.psLoad = NewPsLoad(psUtil)
 
 	return psUtil
 }
@@ -59,6 +59,10 @@ func (psUtil *PsUtil) GetDiskHandler() *PsDisk {
 }
 func (psUtil *PsUtil) GetHostHandler() *PsHost {
 	return psUtil.psHost
+}
+
+func (psUtil *PsUtil) GetLoadHandler() *PsLoad {
+	return psUtil.psLoad
 }
 
 func (psUtil *PsUtil) ParseFlags(cmd *cobra.Command) {

@@ -18,7 +18,6 @@ type PsHost struct {
 	// Command line flags.
 	readable      bool
 	showType      string
-	usagePath     string
 	allPartitions bool
 }
 
@@ -31,8 +30,6 @@ func NewPsHost(psUtil *PsUtil) *PsHost {
 func (psHost *PsHost) ParseFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&psHost.readable, "human-readable", "H", true, "human readable output")
 	cmd.Flags().StringVarP(&psHost.showType, "type", "t", "all", strings.Join([]string{tAll, tInfo, tUserStat}, "|"))
-	cmd.Flags().StringVarP(&psHost.usagePath, "path", "u", "", "if not set depend on -a")
-	cmd.Flags().BoolVarP(&psHost.allPartitions, "all", "a", true, "all partitions")
 }
 
 func (psHost *PsHost) GetHostInfo() {

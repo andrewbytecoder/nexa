@@ -77,7 +77,7 @@ func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
 	cmd.AddCommand(diskCmd)
 	psUtil.GetDiskHandler().ParseFlags(diskCmd)
 
-	// 主机信息同步
+	// 主机信息统计
 	hostCmd := &cobra.Command{
 		Use:     "host",
 		Short:   "psutil host",
@@ -90,4 +90,16 @@ func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
 	cmd.AddCommand(hostCmd)
 	psUtil.GetHostHandler().ParseFlags(hostCmd)
 
+	// 负载信息统计
+	loadCmd := &cobra.Command{
+		Use:     "load",
+		Short:   "psutil load",
+		Long:    `psutil load [global options] command [command options] [arguments...].`,
+		Example: `nexa psutil load"`,
+		Run: func(cmd *cobra.Command, args []string) {
+			psUtil.GetLoadHandler().GetLoadInfo()
+		},
+	}
+	cmd.AddCommand(loadCmd)
+	psUtil.GetLoadHandler().ParseFlags(loadCmd)
 }
