@@ -16,6 +16,7 @@ const (
 	tMem       = "mem"
 	tSwap      = "swap"
 	tSwapDev   = "swapDev"
+	tUserStat  = "userStat"
 )
 
 type PsUtil struct {

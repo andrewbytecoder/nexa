@@ -30,7 +30,7 @@ func NewPsHost(psUtil *PsUtil) *PsHost {
 
 func (psHost *PsHost) ParseFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&psHost.readable, "human-readable", "H", true, "human readable output")
-	cmd.Flags().StringVarP(&psHost.showType, "type", "t", "all", strings.Join([]string{tAll, tInfo}, "|"))
+	cmd.Flags().StringVarP(&psHost.showType, "type", "t", "all", strings.Join([]string{tAll, tInfo, tUserStat}, "|"))
 	cmd.Flags().StringVarP(&psHost.usagePath, "path", "u", "", "if not set depend on -a")
 	cmd.Flags().BoolVarP(&psHost.allPartitions, "all", "a", true, "all partitions")
 }
@@ -40,12 +40,12 @@ func (psHost *PsHost) GetHostInfo() {
 		psHost.showInfo()
 	}
 
-	if psHost.showType == tAll || psHost.showType == tIOCounter {
+	if psHost.showType == tAll || psHost.showType == tUserStat {
+		psHost.showUseStat()
 	}
 }
 
 func (psHost *PsHost) showInfo() {
-
 	info, err := host.Info()
 	if err != nil {
 		psHost.psUtil.logger.Error("unable to get host info", zap.Error(err))
@@ -53,7 +53,43 @@ func (psHost *PsHost) showInfo() {
 	}
 
 	psHost.printHostInfoTable(info)
+}
 
+func (psHost *PsHost) showUseStat() {
+	// 获取使用状态
+	userStats, err := host.Users()
+	if err != nil {
+		psHost.psUtil.logger.Error("unable to get host use stat", zap.Error(err))
+		return
+	}
+	psHost.printUserStats(userStats)
+}
+
+func (psHost *PsHost) printUserStats(usersStats []host.UserStat) {
+	// 创建表格
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header([]string{"User", "Terminal", "Host", "Started"})
+	// 将 Unix 时间戳转换为可读时间
+	for _, u := range usersStats {
+		startedTime := time.Unix(int64(u.Started), 0).Format("2006-01-02 15:04:05")
+		row := []string{
+			u.User,
+			u.Terminal,
+			u.Host,
+			startedTime,
+		}
+		err := table.Append(row)
+		if err != nil {
+			psHost.psUtil.logger.Error("table.Append", zap.Error(err))
+			return
+		}
+	}
+
+	err := table.Render()
+	if err != nil {
+		psHost.psUtil.logger.Error("table.Render", zap.Error(err))
+		return
+	}
 }
 
 func (psHost *PsHost) printHostInfoTable(info *host.InfoStat) {
