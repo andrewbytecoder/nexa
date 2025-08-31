@@ -102,4 +102,17 @@ func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
 	}
 	cmd.AddCommand(loadCmd)
 	psUtil.GetLoadHandler().ParseFlags(loadCmd)
+
+	// 网络信息统计
+	netCmd := &cobra.Command{
+		Use:     "net",
+		Short:   "psutil net",
+		Long:    `psutil net [global options] command [command options] [arguments...].`,
+		Example: `nexa psutil net"`,
+		Run: func(cmd *cobra.Command, args []string) {
+			psUtil.GetNetHandler().GetnetInfo()
+		},
+	}
+	cmd.AddCommand(netCmd)
+	psUtil.GetNetHandler().ParseFlags(netCmd)
 }

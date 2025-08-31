@@ -7,18 +7,21 @@ import (
 )
 
 const (
-	tAll       = "all"
-	tUsage     = "usage"
-	tIOCounter = "IOCounter"
-	tTimes     = "times"
-	tPercent   = "percent"
-	tInfo      = "info"
-	tMem       = "mem"
-	tSwap      = "swap"
-	tSwapDev   = "swapDev"
-	tUserStat  = "userStat"
-	tLoadAvg   = "loadAvg"
-	tLoadMisc  = "loadMisc"
+	tAll            = "all"
+	tUsage          = "usage"
+	tIOCounter      = "IOCounter"
+	tTimes          = "times"
+	tPercent        = "percent"
+	tInfo           = "info"
+	tMem            = "mem"
+	tSwap           = "swap"
+	tSwapDev        = "swapDev"
+	tUserStat       = "userStat"
+	tLoadAvg        = "loadAvg"
+	tLoadMisc       = "loadMisc"
+	tNetIOCounter   = "netIOCounter"
+	tNetIfConfig    = "netIfConfig"
+	tNetConnections = "netConnections"
 )
 
 type PsUtil struct {
@@ -30,6 +33,7 @@ type PsUtil struct {
 	psDisk *PsDisk
 	psHost *PsHost
 	psLoad *PsLoad
+	psNet  *PsNet
 }
 
 func NewPsutil(ctx *ctx.Ctx) *PsUtil {
@@ -43,6 +47,7 @@ func NewPsutil(ctx *ctx.Ctx) *PsUtil {
 	psUtil.psDisk = NewPsDisk(psUtil)
 	psUtil.psHost = NewPsHost(psUtil)
 	psUtil.psLoad = NewPsLoad(psUtil)
+	psUtil.psNet = NewPsnet(psUtil)
 
 	return psUtil
 }
@@ -64,6 +69,9 @@ func (psUtil *PsUtil) GetHostHandler() *PsHost {
 
 func (psUtil *PsUtil) GetLoadHandler() *PsLoad {
 	return psUtil.psLoad
+}
+func (psUtil *PsUtil) GetNetHandler() *PsNet {
+	return psUtil.psNet
 }
 
 func (psUtil *PsUtil) ParseFlags(cmd *cobra.Command) {
