@@ -1,4 +1,4 @@
-package psutil
+package gops
 
 import (
 	"github.com/nexa/pkg/ctx"
@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func GetPsUtilCmd(ctx *ctx.Ctx) []*cobra.Command {
+func GetGoPsCmd(ctx *ctx.Ctx) []*cobra.Command {
 	var cmds []*cobra.Command
 	cmds = append(cmds, newCmd(ctx))
 
