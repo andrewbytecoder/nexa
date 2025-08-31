@@ -2,7 +2,7 @@ package gops
 
 import (
 	"github.com/nexa/pkg/ctx"
-	"github.com/nexa/pkg/psutil"
+	"github.com/nexa/pkg/gops"
 	"github.com/spf13/cobra"
 )
 
@@ -15,13 +15,13 @@ func GetGoPsCmd(ctx *ctx.Ctx) []*cobra.Command {
 
 // newCmdTcpTerm returns a cobra command for fetching versions
 func newCmd(ctx *ctx.Ctx) *cobra.Command {
-	psUtil := psutil.NewPsutil(ctx)
+	psUtil := gops.NewGoPs(ctx)
 
 	cmd := &cobra.Command{
-		Use:     "psutil",
-		Short:   "psutil ps for human",
-		Long:    `nexa psutil [command].`,
-		Example: `nexa psutil memory"`,
+		Use:     "gops",
+		Short:   "gops ps for human",
+		Long:    `nexa gops [command].`,
+		Example: `nexa gops memory"`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 0 {
 				cmd.Help()
@@ -37,13 +37,13 @@ func newCmd(ctx *ctx.Ctx) *cobra.Command {
 	return cmd
 }
 
-func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
+func addSubCmd(psUtil *gops.PsUtil, cmd *cobra.Command) {
 	// 内存使用情况统计
 	memCmd := &cobra.Command{
 		Use:     "memory",
-		Short:   "psutil memory",
-		Long:    `psutil memory [global options] command [command options] [arguments...].`,
-		Example: `nexa psutil memory -H=true"`,
+		Short:   "gops memory",
+		Long:    `gops memory [global options] command [command options] [arguments...].`,
+		Example: `nexa gops memory -H=true"`,
 		Run: func(cmd *cobra.Command, args []string) {
 			psUtil.GetMemoryHandler().GetMemInfo()
 		},
@@ -54,9 +54,9 @@ func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
 	// cpu使用情况统计
 	cpuCmd := &cobra.Command{
 		Use:     "cpu",
-		Short:   "psutil cpu",
-		Long:    `psutil cpu [global options] command [command options] [arguments...].`,
-		Example: `nexa psutil cpu -H=true"`,
+		Short:   "gops cpu",
+		Long:    `gops cpu [global options] command [command options] [arguments...].`,
+		Example: `nexa gops cpu -H=true"`,
 		Run: func(cmd *cobra.Command, args []string) {
 			psUtil.GetCpuHandler().GetCpuInfo()
 		},
@@ -67,9 +67,9 @@ func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
 	// 磁盘使用情况统计
 	diskCmd := &cobra.Command{
 		Use:     "disk",
-		Short:   "psutil disk",
-		Long:    `psutil disk [global options] command [command options] [arguments...].`,
-		Example: `nexa psutil disk"`,
+		Short:   "gops disk",
+		Long:    `gops disk [global options] command [command options] [arguments...].`,
+		Example: `nexa gops disk"`,
 		Run: func(cmd *cobra.Command, args []string) {
 			psUtil.GetDiskHandler().GetDiskInfo()
 		},
@@ -80,9 +80,9 @@ func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
 	// 主机信息统计
 	hostCmd := &cobra.Command{
 		Use:     "host",
-		Short:   "psutil host",
-		Long:    `psutil host [global options] command [command options] [arguments...].`,
-		Example: `nexa psutil host"`,
+		Short:   "gops host",
+		Long:    `gops host [global options] command [command options] [arguments...].`,
+		Example: `nexa gops host"`,
 		Run: func(cmd *cobra.Command, args []string) {
 			psUtil.GetHostHandler().GetHostInfo()
 		},
@@ -93,9 +93,9 @@ func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
 	// 负载信息统计
 	loadCmd := &cobra.Command{
 		Use:     "load",
-		Short:   "psutil load",
-		Long:    `psutil load [global options] command [command options] [arguments...].`,
-		Example: `nexa psutil load"`,
+		Short:   "gops load",
+		Long:    `gops load [global options] command [command options] [arguments...].`,
+		Example: `nexa gops load"`,
 		Run: func(cmd *cobra.Command, args []string) {
 			psUtil.GetLoadHandler().GetLoadInfo()
 		},
@@ -106,9 +106,9 @@ func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
 	// 网络信息统计
 	netCmd := &cobra.Command{
 		Use:     "net",
-		Short:   "psutil net",
-		Long:    `psutil net [global options] command [command options] [arguments...].`,
-		Example: `nexa psutil net"`,
+		Short:   "gops net",
+		Long:    `gops net [global options] command [command options] [arguments...].`,
+		Example: `nexa gops net"`,
 		Run: func(cmd *cobra.Command, args []string) {
 			psUtil.GetNetHandler().GetnetInfo()
 		},
@@ -119,9 +119,9 @@ func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
 	// 进程信息统计
 	processCmd := &cobra.Command{
 		Use:     "process",
-		Short:   "psutil process",
-		Long:    `psutil process [global options] command [command options] [arguments...].`,
-		Example: `nexa psutil process"`,
+		Short:   "gops process",
+		Long:    `gops process [global options] command [command options] [arguments...].`,
+		Example: `nexa gops process"`,
 		Run: func(cmd *cobra.Command, args []string) {
 			psUtil.GetProcessHandler().GetProcessInfo()
 		},
