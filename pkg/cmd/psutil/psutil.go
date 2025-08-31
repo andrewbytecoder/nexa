@@ -115,4 +115,17 @@ func addSubCmd(psUtil *psutil.PsUtil, cmd *cobra.Command) {
 	}
 	cmd.AddCommand(netCmd)
 	psUtil.GetNetHandler().ParseFlags(netCmd)
+
+	// 进程信息统计
+	processCmd := &cobra.Command{
+		Use:     "process",
+		Short:   "psutil process",
+		Long:    `psutil process [global options] command [command options] [arguments...].`,
+		Example: `nexa psutil process"`,
+		Run: func(cmd *cobra.Command, args []string) {
+			psUtil.GetProcessHandler().GetProcessInfo()
+		},
+	}
+	cmd.AddCommand(processCmd)
+	psUtil.GetProcessHandler().ParseFlags(processCmd)
 }

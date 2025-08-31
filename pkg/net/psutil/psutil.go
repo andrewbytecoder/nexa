@@ -24,18 +24,21 @@ const (
 	tNetConnections = "netConnections"
 	tNetConntrack   = "netConntrack"
 	tNetPids        = "netPids"
+	tProcess        = "netProcess"
+	tProcessByPid   = "netProcessByPid"
 )
 
 type PsUtil struct {
 	ctx    *ctx.Ctx
 	logger *zap.Logger
 
-	psMem  *PsMem // 内存信息
-	psCpu  *PsCpu
-	psDisk *PsDisk
-	psHost *PsHost
-	psLoad *PsLoad
-	psNet  *PsNet
+	psMem     *PsMem // 内存信息
+	psCpu     *PsCpu
+	psDisk    *PsDisk
+	psHost    *PsHost
+	psLoad    *PsLoad
+	psNet     *PsNet
+	psProcess *PsProgress
 }
 
 func NewPsutil(ctx *ctx.Ctx) *PsUtil {
@@ -50,6 +53,7 @@ func NewPsutil(ctx *ctx.Ctx) *PsUtil {
 	psUtil.psHost = NewPsHost(psUtil)
 	psUtil.psLoad = NewPsLoad(psUtil)
 	psUtil.psNet = NewPsnet(psUtil)
+	psUtil.psProcess = NewPsProcess(psUtil)
 
 	return psUtil
 }
@@ -74,6 +78,10 @@ func (psUtil *PsUtil) GetLoadHandler() *PsLoad {
 }
 func (psUtil *PsUtil) GetNetHandler() *PsNet {
 	return psUtil.psNet
+}
+
+func (psUtil *PsUtil) GetProcessHandler() *PsProgress {
+	return psUtil.psProcess
 }
 
 func (psUtil *PsUtil) ParseFlags(cmd *cobra.Command) {
