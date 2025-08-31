@@ -23,6 +23,7 @@ type PsNet struct {
 	pid      int32
 	kind     string
 	pernic   bool
+	perCpu   bool
 }
 
 func NewPsnet(psUtil *PsUtil) *PsNet {
@@ -33,12 +34,13 @@ func NewPsnet(psUtil *PsUtil) *PsNet {
 
 func (psnet *PsNet) ParseFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&psnet.readable, "human-readable", "H", true, "human readable output")
-	cmd.Flags().StringVarP(&psnet.showType, "type", "t", "all", strings.Join([]string{tAll, tNetIfConfig, tNetIOCounter, tNetConnections}, "|"))
+	cmd.Flags().StringVarP(&psnet.showType, "type", "t", "all", strings.Join([]string{tAll, tNetIfConfig, tNetIOCounter,
+		tNetConnections, tNetConntrack, tNetPids}, "|"))
 	cmd.Flags().Int32VarP(&psnet.pid, "pid", "p", 0, "get connections by pid")
 	cmd.Flags().StringVarP(&psnet.kind, "kind", "k", "all", strings.Join([]string{"all", "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6",
 		"unix", "inet", "inet4", "inet6"}, "|"))
 	cmd.Flags().BoolVarP(&psnet.pernic, "pernic", "n", false, " If pernic argument is false, return only sum of all information")
-
+	cmd.Flags().BoolVarP(&psnet.perCpu, "percpu", "c", false, "If 'percpu' is false, the result will contain exactly one item with totals/summary")
 }
 
 func (psNet *PsNet) GetnetInfo() {
@@ -53,8 +55,102 @@ func (psNet *PsNet) GetnetInfo() {
 	if psNet.showType == tAll || psNet.showType == tNetConnections {
 		psNet.showNetConnections()
 	}
+
+	if psNet.showType == tAll || psNet.showType == tNetConntrack {
+		psNet.showNetConntrack()
+	}
+
+	if psNet.showType == tAll || psNet.showType == tNetPids {
+		psNet.showNetPids()
+	}
+
 }
 
+func (psNet *PsNet) showNetPids() {
+	pids, err := net.Pids()
+	if err != nil {
+		psNet.psUtil.logger.Error("Error getting network info", zap.Error(err))
+		return
+	}
+	fmt.Printf("PIDs: %v\n", pids)
+}
+
+func (psNet *PsNet) showNetConntrack() {
+	stats, err := net.ConntrackStats(psNet.perCpu)
+	if err != nil {
+		psNet.psUtil.logger.Error("Error getting network info", zap.Error(err))
+		return
+	}
+	// 构建表头
+	headers := []string{"Metric"}
+	for i := range stats {
+		headers = append(headers, fmt.Sprintf("CPU %d", i))
+	}
+
+	// 创建表格
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header(headers)
+	// 所有指标名称（按顺序）
+	metrics := []struct {
+		name string
+		get  func(net.ConntrackStat) uint32
+	}{
+		{"Entries", func(s net.ConntrackStat) uint32 { return s.Entries }},
+		{"Searched", func(s net.ConntrackStat) uint32 { return s.Searched }},
+		{"Found", func(s net.ConntrackStat) uint32 { return s.Found }},
+		{"New", func(s net.ConntrackStat) uint32 { return s.New }},
+		{"Invalid", func(s net.ConntrackStat) uint32 { return s.Invalid }},
+		{"Ignore", func(s net.ConntrackStat) uint32 { return s.Ignore }},
+		{"Delete", func(s net.ConntrackStat) uint32 { return s.Delete }},
+		{"DeleteList", func(s net.ConntrackStat) uint32 { return s.DeleteList }},
+		{"Insert", func(s net.ConntrackStat) uint32 { return s.Insert }},
+		{"InsertFailed", func(s net.ConntrackStat) uint32 { return s.InsertFailed }},
+		{"Drop", func(s net.ConntrackStat) uint32 { return s.Drop }},
+		{"EarlyDrop", func(s net.ConntrackStat) uint32 { return s.EarlyDrop }},
+		{"IcmpError", func(s net.ConntrackStat) uint32 { return s.IcmpError }},
+		{"ExpectNew", func(s net.ConntrackStat) uint32 { return s.ExpectNew }},
+		{"ExpectCreate", func(s net.ConntrackStat) uint32 { return s.ExpectCreate }},
+		{"ExpectDelete", func(s net.ConntrackStat) uint32 { return s.ExpectDelete }},
+		{"SearchRestart", func(s net.ConntrackStat) uint32 { return s.SearchRestart }},
+	}
+
+	// 添加每一行（每个 metric）
+	for _, m := range metrics {
+		row := []string{m.name}
+		for _, s := range stats {
+			row = append(row, formatUint32(m.get(s)))
+		}
+		err := table.Append(row)
+		if err != nil {
+			psNet.psUtil.logger.Error("table.Append", zap.Error(err))
+			return
+		}
+	}
+
+	err = table.Render()
+	if err != nil {
+		psNet.psUtil.logger.Error("table.Render", zap.Error(err))
+		return
+	}
+}
+
+// formatUint32 添加千位分隔符并右对齐
+func formatUint32(n uint32) string {
+	return fmt.Sprintf("%12s", comma(n))
+}
+
+// comma 添加千位分隔符
+func comma(n uint32) string {
+	in := strconv.FormatUint(uint64(n), 10)
+	out := ""
+	for i, c := range in {
+		if i > 0 && (len(in)-i)%3 == 0 {
+			out += ","
+		}
+		out += string(c)
+	}
+	return out
+}
 func (psNet *PsNet) showNetConnections() {
 	connections, err := net.ConnectionsPid(psNet.kind, psNet.pid)
 	if err != nil {

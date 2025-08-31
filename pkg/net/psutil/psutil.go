@@ -22,6 +22,8 @@ const (
 	tNetIOCounter   = "netIOCounter"
 	tNetIfConfig    = "netIfConfig"
 	tNetConnections = "netConnections"
+	tNetConntrack   = "netConntrack"
+	tNetPids        = "netPids"
 )
 
 type PsUtil struct {
