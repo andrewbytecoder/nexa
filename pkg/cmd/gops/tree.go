@@ -10,7 +10,7 @@ import (
 	"github.com/xlab/treeprint"
 )
 
-// TreeCommand displays a process tree.
+// TreeCommand displays a process tree
 func TreeCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "tree",
