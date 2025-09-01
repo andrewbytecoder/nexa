@@ -11,7 +11,7 @@ type PsCmd struct {
 	logger *zap.Logger
 }
 
-func NewPsutil(ctx *ctx.Ctx) *PsCmd {
+func NewGoPs(ctx *ctx.Ctx) *PsCmd {
 	psUtil := &PsCmd{
 		ctx:    ctx,
 		logger: ctx.Logger(),

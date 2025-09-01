@@ -19,8 +19,8 @@ func newCmdHttpStat(ctx *ctx.Ctx) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "httpstat",
-		Short:   "nexa httpstat www.google.com",
-		Long:    `nexa httpstat www.google.com -X GET.`,
+		Short:   "nexa httpstat url",
+		Long:    `nexa httpstat url -X GET.`,
 		Example: `nexa httpstat www.google.com -X GET -H "Accept: application/json, text/plain, */*"`,
 	}
 	cmd.Run = func(cmd *cobra.Command, args []string) {

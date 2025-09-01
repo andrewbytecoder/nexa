@@ -2,6 +2,7 @@
 package cmdregister
 
 import (
+	"github.com/nexa/pkg/cmd/gops"
 	"github.com/nexa/pkg/cmd/httpstat"
 	"github.com/nexa/pkg/cmd/psutil"
 	"github.com/nexa/pkg/cmd/version"
@@ -60,8 +61,9 @@ func (n *NexaCommand) AddCommand(cmd []*cobra.Command) *NexaCommand {
 func (n *NexaCommand) RegisterCmd(ctx *ctx.Ctx) {
 	n.AddCommand(httpstat.GetHttpCmd(ctx))
 	n.AddCommand(psutil.GetPsUtilCmd(ctx))
-	n.AddCommand(version.GetVersionCmd(ctx))
+	n.AddCommand(gops.GetGoPsCmd(ctx))
 
+	n.AddCommand(version.GetVersionCmd(ctx))
 	for _, v := range n.cmdList {
 		n.cmd.AddCommand(v)
 	}
