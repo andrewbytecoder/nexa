@@ -2,12 +2,13 @@ package psutil
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/olekukonko/tablewriter"
 	"github.com/shirou/gopsutil/v4/load"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"os"
-	"strings"
 )
 
 type PsLoad struct {

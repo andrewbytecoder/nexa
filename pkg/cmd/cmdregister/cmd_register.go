@@ -2,13 +2,14 @@
 package cmdregister
 
 import (
+	"sync"
+
 	"github.com/nexa/pkg/cmd/gops"
 	"github.com/nexa/pkg/cmd/httpstat"
 	"github.com/nexa/pkg/cmd/psutil"
 	"github.com/nexa/pkg/cmd/version"
 	"github.com/nexa/pkg/ctx"
 	"github.com/spf13/cobra"
-	"sync"
 )
 
 // NexaCommand 结构体用于封装主命令及其所有子命令

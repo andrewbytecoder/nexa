@@ -2,16 +2,17 @@ package psutil
 
 import (
 	"fmt"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
+
 	"github.com/olekukonko/tablewriter"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/net"
 	"github.com/shirou/gopsutil/v4/process"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"os"
-	"sort"
-	"strconv"
-	"strings"
 )
 
 type PsProgress struct {

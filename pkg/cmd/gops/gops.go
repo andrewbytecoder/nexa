@@ -1,10 +1,11 @@
 package gops
 
 import (
+	"strconv"
+
 	"github.com/nexa/pkg/ctx"
 	"github.com/nexa/pkg/gops"
 	"github.com/spf13/cobra"
-	"strconv"
 )
 
 func GetGoPsCmd(ctx *ctx.Ctx) []*cobra.Command {

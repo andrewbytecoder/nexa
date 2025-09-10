@@ -2,10 +2,11 @@ package psutil
 
 import (
 	"fmt"
-	"github.com/shirou/gopsutil/v4/mem"
-	"github.com/spf13/cobra"
 	"log"
 	"strings"
+
+	"github.com/shirou/gopsutil/v4/mem"
+	"github.com/spf13/cobra"
 )
 
 type PsMem struct {
@@ -27,7 +28,6 @@ func (psMem *PsMem) ParseFlags(cmd *cobra.Command) {
 	//  -h, --human-readable
 	cmd.Flags().BoolVarP(&psMem.readable, "human-readable", "H", true, "human readable output")
 	cmd.Flags().StringVarP(&psMem.showType, "type", "t", "all", strings.Join([]string{tAll, tMem, tSwap, tSwapDev}, "|"))
-
 }
 
 func (psMem *PsMem) GetMemInfo() {

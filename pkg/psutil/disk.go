@@ -2,14 +2,15 @@ package psutil
 
 import (
 	"fmt"
-	"github.com/olekukonko/tablewriter"
-	"github.com/shirou/gopsutil/v4/disk"
-	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 	"os"
 	"strconv"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/olekukonko/tablewriter"
+	"github.com/shirou/gopsutil/v4/disk"
+	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 type PsDisk struct {

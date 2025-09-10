@@ -3,14 +3,15 @@ package psutil
 import (
 	"context"
 	"fmt"
-	"github.com/shirou/gopsutil/v4/cpu"
-	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 	"os"
 	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 type PsCpu struct {

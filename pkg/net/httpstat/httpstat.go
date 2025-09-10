@@ -7,10 +7,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/fatih/color"
-	"github.com/nexa/pkg/ctx"
-	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 	"io"
 	"log"
 	"mime"
@@ -24,6 +20,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/fatih/color"
+	"github.com/nexa/pkg/ctx"
+	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 type HttpStat struct {

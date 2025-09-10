@@ -2,13 +2,14 @@ package psutil
 
 import (
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/olekukonko/tablewriter"
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"os"
-	"strings"
-	"time"
 )
 
 type PsHost struct {

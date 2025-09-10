@@ -2,6 +2,10 @@ package psutil
 
 import (
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 	"github.com/olekukonko/tablewriter/renderer"
@@ -9,9 +13,6 @@ import (
 	net "github.com/shirou/gopsutil/v4/net"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"os"
-	"strconv"
-	"strings"
 )
 
 type PsNet struct {
