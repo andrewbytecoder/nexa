@@ -22,6 +22,8 @@ func newCmd(ctx *ctx.Ctx) *cobra.Command {
 		Short:   "psutil ps for human",
 		Long:    `nexa psutil [command].`,
 		Example: `nexa psutil memory"`,
+		// stop printing usage when the command errors
+		SilenceUsage: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 0 {
 				cmd.Help()

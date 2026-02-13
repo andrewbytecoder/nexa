@@ -18,7 +18,9 @@ func ProcessCommand() *cobra.Command {
 		Use:     "process <pid> [period]",
 		Aliases: []string{"pid", "proc"},
 		Short:   "Prints information about a Go process.",
-		Args:    cobra.MinimumNArgs(1),
+		// stop printing usage when the command errors
+		SilenceUsage: true,
+		Args:         cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return ProcessInfo(args)
 		},

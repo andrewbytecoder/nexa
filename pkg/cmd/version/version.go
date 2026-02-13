@@ -20,6 +20,8 @@ func newCmdVersion() *cobra.Command {
 		Short:   "Print the client and server version information",
 		Long:    "Print the client and server version information for the current ctx.",
 		Example: "Print the client and server versions for the current ctx kubectl version",
+		// stop printing usage when the command errors
+		SilenceUsage: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},

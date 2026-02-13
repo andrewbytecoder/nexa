@@ -20,6 +20,8 @@ func NewRoot() *cobra.Command {
 		Example: `  gops <cmd> <pid|addr> ...
   gops <pid> # displays process info
   gops help  # displays this help message`,
+		// stop printing usage when the command errors
+		SilenceUsage: true,
 		// TODO(jbd): add link that explains the use of agent.
 		Run: func(cmd *cobra.Command, args []string) {
 			processes()

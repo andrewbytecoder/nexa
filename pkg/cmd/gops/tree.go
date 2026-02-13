@@ -15,6 +15,8 @@ func TreeCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "tree",
 		Short: "Display parent-child tree for Go processes.",
+		// stop printing usage when the command errors
+		SilenceUsage: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			displayProcessTree()
 		},

@@ -4,11 +4,6 @@ package cmdregister
 import (
 	"sync"
 
-	"github.com/nexa/pkg/cmd/gops"
-	"github.com/nexa/pkg/cmd/httpstat"
-	"github.com/nexa/pkg/cmd/psutil"
-	"github.com/nexa/pkg/cmd/version"
-	"github.com/nexa/pkg/ctx"
 	"github.com/spf13/cobra"
 )
 
@@ -30,6 +25,8 @@ func NewNexaCommand() *NexaCommand {
 		Use:   "nexa",
 		Short: "Nexa is a command line tool",
 		Long:  `Nexa is a command line tool for managing your nexa`,
+		// stop printing usage when the command errors
+		SilenceUsage: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
@@ -54,28 +51,16 @@ func GetNexaCommand() *NexaCommand {
 
 // AddCommand 添加子命令到命令列表中
 func (n *NexaCommand) AddCommand(cmd []*cobra.Command) *NexaCommand {
-	n.cmdList = append(n.cmdList, cmd...)
+	n.cmd.AddCommand(cmd...)
 	return n
 }
 
-// RegisterCmd 注册所有子命令到主命令中
-func (n *NexaCommand) RegisterCmd(ctx *ctx.Ctx) {
-	n.AddCommand(httpstat.GetHttpCmd(ctx))
-	n.AddCommand(psutil.GetPsUtilCmd(ctx))
-	n.AddCommand(gops.GetGoPsCmd(ctx))
-
-	n.AddCommand(version.GetVersionCmd(ctx))
-	for _, v := range n.cmdList {
-		n.cmd.AddCommand(v)
-	}
-}
-
 // Execute 执行命令行程序
-func Execute() {
-	GetNexaCommand().RegisterCmd(ctx.New())
-	if err := GetNexaCommand().cmd.Execute(); err != nil {
-		panic(err)
+func (n *NexaCommand) Execute() error {
+	if err := n.cmd.Execute(); err != nil {
+		return err
 	}
+	return nil
 }
 
 // AddCommand 全局函数，用于向单例中添加命令

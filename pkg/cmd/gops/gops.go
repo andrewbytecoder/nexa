@@ -26,6 +26,8 @@ func newCmd(ctx *ctx.Ctx) *cobra.Command {
 		Example: `nexa gops <cmd> <pid|addr> ...
 		gops <pid> # displays process info
 		gops help  # displays this help message`,
+		// stop printing usage when the command errors
+		SilenceUsage: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			processes()
 
