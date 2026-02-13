@@ -127,3 +127,8 @@ func writeJSON(c *gin.Context, code int, v any) {
 	c.Header("Content-Type", jsonContentType)
 	c.JSON(code, v)
 }
+
+func writeResponse(c *gin.Context, status int, contentType string, body []byte) {
+	c.Header("Content-Type", contentType)
+	c.JSON(status, body)
+}

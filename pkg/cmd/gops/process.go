@@ -1,9 +1,13 @@
 package gops
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/google/gops/goprocess"
 	"log"
 	"math"
+	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +15,62 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/spf13/cobra"
 )
+
+var develRe = regexp.MustCompile(`devel\s+\+\w+`)
+
+func processes() {
+	ps := goprocess.FindAll()
+
+	var maxPID, maxPPID, maxExec, maxVersion int
+	for i, p := range ps {
+		ps[i].BuildVersion = shortenVersion(p.BuildVersion)
+		maxPID = max(maxPID, len(strconv.Itoa(p.PID)))
+		maxPPID = max(maxPPID, len(strconv.Itoa(p.PPID)))
+		maxExec = max(maxExec, len(p.Exec))
+		maxVersion = max(maxVersion, len(ps[i].BuildVersion))
+
+	}
+
+	for _, p := range ps {
+		buf := bytes.NewBuffer(nil)
+		pid := strconv.Itoa(p.PID)
+		_, _ = fmt.Fprint(buf, pad(pid, maxPID))
+		_, _ = fmt.Fprint(buf, " ")
+		ppid := strconv.Itoa(p.PPID)
+		_, _ = fmt.Fprint(buf, pad(ppid, maxPPID))
+		_, _ = fmt.Fprint(buf, " ")
+		_, _ = fmt.Fprint(buf, pad(p.Exec, maxExec))
+		if p.Agent {
+			_, _ = fmt.Fprint(buf, "*")
+		} else {
+			_, _ = fmt.Fprint(buf, " ")
+		}
+		_, _ = fmt.Fprint(buf, " ")
+		_, _ = fmt.Fprint(buf, pad(p.BuildVersion, maxVersion))
+		_, _ = fmt.Fprint(buf, " ")
+		_, _ = fmt.Fprint(buf, p.Path)
+		_, _ = fmt.Fprintln(buf)
+		_, _ = buf.WriteTo(os.Stdout)
+	}
+}
+
+func shortenVersion(v string) string {
+	if !strings.HasPrefix(v, "devel") {
+		return v
+	}
+	results := develRe.FindAllString(v, 1)
+	if len(results) == 0 {
+		return v
+	}
+	return results[0]
+}
+
+func pad(s string, total int) string {
+	if len(s) >= total {
+		return s
+	}
+	return s + strings.Repeat(" ", total-len(s))
+}
 
 // ProcessCommand displays information about a Go process.
 func ProcessCommand() *cobra.Command {
@@ -130,12 +190,18 @@ func fmtEtimeDuration(d time.Duration) string {
 	seconds := math.Mod(minutes.Seconds(), 60)
 	var b strings.Builder
 	if days > 0 {
-		fmt.Fprintf(&b, "%02d-", days)
+		_, err := fmt.Fprintf(&b, "%02d-", days)
+		if err != nil {
+			return ""
+		}
 	}
 	if days > 0 || hours/time.Hour > 0 {
-		fmt.Fprintf(&b, "%02d:", hours/time.Hour)
+		_, err := fmt.Fprintf(&b, "%02d:", hours/time.Hour)
+		if err != nil {
+			return ""
+		}
 	}
-	fmt.Fprintf(&b, "%02d:", minutes/time.Minute)
-	fmt.Fprintf(&b, "%02.0f", seconds)
+	_, _ = fmt.Fprintf(&b, "%02d:", minutes/time.Minute)
+	_, _ = fmt.Fprintf(&b, "%02.0f", seconds)
 	return b.String()
 }
