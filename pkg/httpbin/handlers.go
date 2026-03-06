@@ -2,6 +2,7 @@ package httpbin
 
 import (
 	"bytes"
+	"compress/gzip"
 	"compress/zlib"
 	"encoding/base64"
 	"fmt"
@@ -9,12 +10,15 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/nexa/pkg/httpbin/digest"
 	"github.com/nexa/pkg/httpbin/websocket"
 )
 
@@ -516,4 +520,246 @@ func (h *HttpBin) Delay(c *gin.Context) {
 
 	// 调用 RequestWithBody 处理后续逻辑
 	h.RequestWithBody(c)
+}
+
+func (h *HttpBin) Deny(c *gin.Context) {
+	writeResponse(c, http.StatusOK, textContentType, []byte(`YOU SHOULDN'T BE HERE`))
+}
+
+// DigestAuth handles a simple implementation of HTTP Digest Authentication,
+// which supports the "auth" QOP and the MD5 and SHA-256 crypto algorithms.
+//
+// /digest-auth/<qop>/<user>/<password>
+// /digest-auth/<qop>/<user>/<password>/<algorithm>
+func (h *HttpBin) DigestAuth(c *gin.Context) {
+	var (
+		qop      = strings.ToLower(c.Param("qop"))
+		user     = c.Param("user")
+		password = c.Param("password")
+		algoName = strings.ToUpper(c.Param("algorithm"))
+	)
+	if algoName == "" {
+		algoName = "MD5"
+	}
+
+	if qop != "" && qop != "auth" {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("invalid qop: %s", qop))
+		return
+	}
+
+	if algoName != "MD5" && algoName != "SHA-256" {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("invalid algorithm: %s", algoName))
+		return
+	}
+
+	algorithm := digest.MD5
+	if algoName == "SHA-256" {
+		algorithm = digest.SHA256
+	}
+
+	if !digest.Check(c.Request, user, password) {
+		c.Header("WWW-Authenticate", digest.Challenge("go-httpbin", algorithm))
+		writeError(c, http.StatusUnauthorized, fmt.Errorf("invalid credentials"))
+		return
+	}
+
+	writeJSON(c, http.StatusOK, authResponse{
+		Authenticated: true,
+		Authorized:    true,
+		User:          user,
+	})
+}
+
+// Drip simulates a slow HTTP server by writing data over a given duration
+// after an optional initial delay.
+//
+// Because this endpoint is intended to simulate a slow HTTP connection, it
+// intentionally does NOT use chunked transfer encoding even though its
+// implementation writes the response incrementally.
+//
+// See Stream (/stream) or StreamBytes (/stream-bytes) for endpoints that
+// respond using chunked transfer encoding.
+func (h *HttpBin) Drip(c *gin.Context) {
+	var (
+		duration = h.DefaultParams.DripDuration
+		delay    = h.DefaultParams.DripDelay
+		numBytes = h.DefaultParams.DripNumBytes
+		code     = http.StatusOK
+
+		err error
+	)
+
+	if userDuration := c.Query("duration"); userDuration != "" {
+		duration, err = parseBoundedDuration(userDuration, 0, h.MaxDuration)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err)
+			return
+		}
+	}
+
+	if userDelay := c.Query("delay"); userDelay != "" {
+		delay, err = parseBoundedDuration(userDelay, 0, h.MaxDuration)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err)
+			return
+		}
+	}
+
+	if userNumBytes := c.Query("numbytes"); userNumBytes != "" {
+		numBytes, err = strconv.ParseInt(userNumBytes, 10, 64)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err)
+			return
+		} else if numBytes < 1 || numBytes > h.MaxBodySize {
+			writeError(c, http.StatusBadRequest, fmt.Errorf("numbytes must be between 1 and %d", h.MaxBodySize))
+			return
+		}
+	}
+
+	if userCode := c.Query("code"); userCode != "" {
+		code, err = parseStatusCode(userCode)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err)
+			return
+		}
+	}
+
+	if duration+delay > h.MaxDuration {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("duration + delay must be less than %s", h.MaxDuration))
+		return
+	}
+
+	pause := duration
+	if numBytes > 1 {
+		pause = duration / time.Duration(numBytes-1)
+	}
+	if delay > 0 {
+		select {
+		case <-time.After(delay):
+		case <-c.Request.Context().Done():
+			c.Status(499) // "Client Closed Request" https://httpstatuses.com/499
+			return
+		}
+	}
+
+	c.Header("Content-Type", textContentType)
+	c.Header("Content-Length", fmt.Sprintf("%d", numBytes))
+	c.Header("Server-Timing", encodeServerTimings([]serverTiming{
+		{"total_duration", delay + duration, "total request duration"},
+		{"initial_delay", delay, "initial delay"},
+		{"write_duration", duration, "duration of writes after initial delay"},
+		{"pause_per_write", pause, "computed pause between writes"},
+	}))
+	c.Status(code)
+
+	b := []byte{'*'}
+
+	if pause == 0 {
+		c.Data(http.StatusOK, textContentType, bytes.Repeat(b, int(numBytes)))
+		return
+	}
+
+	ticker := time.NewTicker(pause)
+	defer ticker.Stop()
+
+	for i := int64(0); i < numBytes; i++ {
+		c.Writer.Write(b)
+		if i == numBytes-1 {
+			return
+		}
+
+		select {
+		case <-ticker.C:
+		case <-c.Request.Context().Done():
+			return
+		}
+	}
+}
+
+// DumpRequest - returns the given request in its HTTP/1.x wire representation.
+// The returned representation is an approximation only;
+// some details of the initial request are lost while parsing it into
+// an http.Request. In particular, the order and case of header field
+// names are lost.
+func (h *HttpBin) DumpRequest(c *gin.Context) {
+	dump, err := httputil.DumpRequest(c.Request, true)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":       "failed to dump request",
+			"detail":      err.Error(),
+			"status_code": http.StatusInternalServerError,
+		})
+		return
+	}
+	c.Data(http.StatusOK, "text/plain", dump)
+}
+
+// Env - returns environment variables with HTTPBIN_ prefix, if any pre-configured by operator
+func (h *HttpBin) Env(c *gin.Context) {
+	envroinment := os.Environ()
+	for _, env := range envroinment {
+		b, a, found := strings.Cut(env, "=")
+		if !found {
+			continue
+		}
+
+		h.env[b] = a
+	}
+
+	writeJSON(c, http.StatusOK, &envResponse{
+		Env: h.env,
+	})
+}
+
+// ETag assumes the resource has the given etag and responds to If-None-Match
+// and If-Match headers appropriately.
+func (h *HttpBin) ETag(c *gin.Context) {
+	etag := c.Param("etag")
+	c.Header("ETag", etag)
+	c.Header("Cache-Control", textContentType)
+	var buf bytes.Buffer
+	mustMarshalJSON(&buf, noBodyResponse{
+		Args:    c.Request.URL.Query(),
+		Headers: getRequestHeaders(c, h.excludeHeadersProcessor),
+		Method:  c.Request.Method,
+		Origin:  c.ClientIP(),
+		URL:     getURL(c.Request).String(),
+	})
+
+	if noneMatch := c.Request.Header.Get("If-None-Match"); noneMatch != "" {
+		if noneMatch == etag || noneMatch == fmt.Sprintf(`"%s"`, etag) {
+			c.Status(http.StatusNotModified)
+			return
+		}
+	}
+
+	if match := c.Request.Header.Get("If-Match"); match != "" {
+		if match != etag && match != fmt.Sprintf(`"%s"`, etag) {
+			c.Status(http.StatusPreconditionFailed)
+			return
+		}
+	}
+
+	c.DataFromReader(http.StatusOK, int64(buf.Len()), "application/json", &buf, nil)
+}
+
+// Gzip returns a gzipped response
+func (h *HttpBin) Gzip(c *gin.Context) {
+	var (
+		buf bytes.Buffer
+		gzw = gzip.NewWriter(&buf)
+	)
+	mustMarshalJSON(gzw, &noBodyResponse{
+		Args:    c.Request.URL.Query(),
+		Headers: getRequestHeaders(c, h.excludeHeadersProcessor),
+		Method:  c.Request.Method,
+		Origin:  c.ClientIP(),
+		Gzipped: true,
+	})
+	gzw.Close()
+
+	body := buf.Bytes()
+	c.Header("Content-Encoding", "gzip")
+	c.Header("Content-Length", strconv.Itoa(len(body)))
+	c.Data(http.StatusOK, jsonContentType, body)
 }

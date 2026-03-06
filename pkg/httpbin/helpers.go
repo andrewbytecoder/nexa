@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"mime"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -180,6 +181,20 @@ func parseBoundedDuration(input string, minVal, maxVal time.Duration) (time.Dura
 	return d, err
 }
 
+func parseStatusCode(input string) (int, error) {
+	return parseBoundedStatusCode(input, 100, 599)
+}
+func parseBoundedStatusCode(input string, minVal, maxVal int) (int, error) {
+	code, err := strconv.Atoi(input)
+	if err != nil {
+		return 0, fmt.Errorf("invalid status code: %q: %w", input, err)
+	}
+	if code < minVal || code > maxVal {
+		return 0, fmt.Errorf("invalid status code: %d not in range [%d, %d]", code, minVal, maxVal)
+	}
+	return code, nil
+}
+
 // Server-Timing header/trailer helpers. See MDN docs for reference:
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Server-Timing
 type serverTiming struct {
@@ -188,6 +203,38 @@ type serverTiming struct {
 	desc string
 }
 
+func getURL(r *http.Request) *url.URL {
+	scheme := r.Header.Get("X-Forwarded-Proto")
+	if scheme == "" {
+		scheme = r.Header.Get("X-Forwarded-Protocol")
+	}
+	if scheme == "" && r.Header.Get("X-Forwarded-Ssl") == "on" {
+		scheme = "https"
+	}
+	if scheme == "" && r.TLS != nil {
+		scheme = "https"
+	}
+	if scheme == "" {
+		scheme = "http"
+	}
+
+	host := r.URL.Host
+	if host == "" {
+		host = r.Host
+	}
+
+	return &url.URL{
+		Scheme:     scheme,
+		Opaque:     r.URL.Opaque,
+		User:       r.URL.User,
+		Host:       host,
+		Path:       r.URL.Path,
+		RawPath:    r.URL.RawPath,
+		ForceQuery: r.URL.ForceQuery,
+		RawQuery:   r.URL.RawQuery,
+		Fragment:   r.URL.Fragment,
+	}
+}
 func encodeServerTimings(timings []serverTiming) string {
 	entries := make([]string, len(timings))
 	for i, t := range timings {

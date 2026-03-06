@@ -71,6 +71,17 @@ type HttpBin struct {
 	RequestConfig
 }
 
+// DefaultDefaultParams defines the DefaultParams that are used by default. In
+// general, these should match the original httpbin.org's defaults.
+var DefaultDefaultParams = DefaultParams{
+	DripDuration: 2 * time.Second,
+	DripDelay:    2 * time.Second,
+	DripNumBytes: 10,
+	SSECount:     10,
+	SSEDuration:  5 * time.Second,
+	SSEDelay:     0,
+}
+
 // DefaultParams defines default parameter values
 type DefaultParams struct {
 	// for the /drip endpoint
@@ -107,9 +118,11 @@ func New(ctx *ctx.Ctx) *HttpBin {
 		ctx:      ctx,
 		logger:   ctx.Logger(),
 		hostname: DefaultHostname,
+
 		RequestConfig: RequestConfig{
-			MaxBodySize: DefaultMaxBodySize,
-			MaxDuration: DefaultMaxDuration,
+			MaxBodySize:   DefaultMaxBodySize,
+			MaxDuration:   DefaultMaxDuration,
+			DefaultParams: DefaultDefaultParams,
 		},
 	}
 }
@@ -147,5 +160,13 @@ func (h *HttpBin) AddRouters() {
 	g.Any("/cookies/set", h.SetCookies)
 	g.Any("/deflate", h.Deflate)
 	g.Any("/delay/{duration}", h.Delay)
+	g.Any("/deny", h.Deny)
+	g.Any("/digest-auth/{qop}/{user}/{password}", h.DigestAuth)
+	g.Any("/digest-auth/{qop}/{user}/{password}/{algorithm}", h.DigestAuth)
+	g.Any("/drip", h.Drip)
+	g.Any("/dump/request", h.DumpRequest)
+	g.Any("/env", h.Env)
+	g.Any("/etag/{etag}", h.ETag)
+	g.Any("/gzip", h.Gzip)
 
 }
