@@ -834,5 +834,22 @@ func (h *HttpBin) ImageAccept(c *gin.Context) {
 	switch accept {
 
 	}
+}
 
+// IP echoes the IP address of the incoming request
+func (h *HttpBin) IP(c *gin.Context) {
+	writeJSON(c, http.StatusOK, &ipResponse{
+		Origin: c.ClientIP(),
+	})
+}
+
+func (h *HttpBin) JSON(c *gin.Context) {
+	writeJSON(c, http.StatusOK, &bodyResponse{
+		Args:    c.Request.URL.Query(),
+		Headers: getRequestHeaders(c, h.excludeHeadersProcessor),
+		Method:  c.Request.Method,
+		Origin:  c.ClientIP(),
+		URL:     getURL(c.Request).String(),
+		JSON:    mustStaticAsset("sample.json"),
+	})
 }

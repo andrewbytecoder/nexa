@@ -172,7 +172,9 @@ func (h *HttpBin) AddRouters() {
 	g.Any("/hidden-basic-auth/{user}/{password}", h.HiddenBasicAuth)
 	g.Any("/hostname", h.HostName)
 	g.Any("html", h.Html)
-	g.Any("/image", h.Image)
+	g.Any("/image", h.ImageAccept)
 	g.Any("/image/{kind}", h.Image)
+	g.Any("/ip", h.IP)
+	g.Any("/json", h.JSON)
 
 }
