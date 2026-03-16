@@ -168,5 +168,11 @@ func (h *HttpBin) AddRouters() {
 	g.Any("/env", h.Env)
 	g.Any("/etag/{etag}", h.ETag)
 	g.Any("/gzip", h.Gzip)
+	g.Any("/headers", h.Headers)
+	g.Any("/hidden-basic-auth/{user}/{password}", h.HiddenBasicAuth)
+	g.Any("/hostname", h.HostName)
+	g.Any("html", h.Html)
+	g.Any("/image", h.Image)
+	g.Any("/image/{kind}", h.Image)
 
 }

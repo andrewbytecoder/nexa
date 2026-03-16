@@ -132,3 +132,7 @@ func writeResponse(c *gin.Context, status int, contentType string, body []byte) 
 	c.Header("Content-Type", contentType)
 	c.JSON(status, body)
 }
+
+func writeHTML(c *gin.Context, status int, body []byte) {
+	writeResponse(c, status, htmlContentType, body)
+}

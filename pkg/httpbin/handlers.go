@@ -763,3 +763,76 @@ func (h *HttpBin) Gzip(c *gin.Context) {
 	c.Header("Content-Length", strconv.Itoa(len(body)))
 	c.Data(http.StatusOK, jsonContentType, body)
 }
+
+func (h *HttpBin) Headers(c *gin.Context) {
+	writeJSON(c, http.StatusOK, &noBodyResponse{
+		Args:    c.Request.URL.Query(),
+		Headers: getRequestHeaders(c, h.excludeHeadersProcessor),
+		Method:  c.Request.Method,
+		Origin:  c.ClientIP(),
+		URL:     getURL(c.Request).String(),
+	})
+}
+
+func (h *HttpBin) HiddenBasicAuth(c *gin.Context) {
+	expectedUser := c.Param("user")
+	expectedPass := c.Param("password")
+
+	givenUser, givenPass, ok := c.Request.BasicAuth()
+	if !ok || givenUser != expectedUser || givenPass != expectedPass {
+		writeError(c, http.StatusUnauthorized, fmt.Errorf("invalid credentials"))
+		return
+	}
+
+	authorized := givenUser == expectedUser && givenPass == expectedPass
+	if authorized {
+		writeJSON(c, http.StatusOK, &authResponse{
+			Authenticated: authorized,
+			Authorized:    authorized,
+			User:          givenUser,
+		})
+	} else {
+		writeError(c, http.StatusUnauthorized, fmt.Errorf("invalid credentials"))
+	}
+}
+
+// HostName - returns the hostname.
+func (h *HttpBin) HostName(c *gin.Context) {
+	writeJSON(c, http.StatusOK, &hostnameResponse{
+		Hostname: h.hostname,
+	})
+}
+
+// Html renders a basic HTML page
+func (h *HttpBin) Html(c *gin.Context) {
+	writeHTML(c, http.StatusOK, mustStaticAsset("moby.html"))
+}
+
+func (h *HttpBin) Image(c *gin.Context) {
+	doImage(c, c.Param("kind"))
+}
+
+// doImage responds with a specific kind of image, if there is an image asset
+// of the given kind.
+func doImage(c *gin.Context, kind string) {
+	img, err := staticAsset(fmt.Sprintf("image.%s", kind))
+	if err != nil {
+		writeError(c, http.StatusNotFound, err)
+		return
+	}
+	contentType := fmt.Sprintf("image/%s", kind)
+	if kind == "svg" {
+		contentType = "image/svg+xml"
+	}
+
+	writeResponse(c, http.StatusOK, contentType, img)
+}
+
+// ImageAccept responds with an appropriate image based on the Accept header
+func (h *HttpBin) ImageAccept(c *gin.Context) {
+	accept := c.GetHeader("Accept")
+	switch accept {
+
+	}
+
+}
