@@ -7,6 +7,7 @@ import (
 	"github.com/nexa/pkg/cmd/gops"
 	"github.com/nexa/pkg/cmd/httpstat"
 	"github.com/nexa/pkg/cmd/psutil"
+	"github.com/nexa/pkg/cmd/udp"
 	"github.com/nexa/pkg/cmd/version"
 	"github.com/nexa/pkg/ctx"
 )
@@ -20,7 +21,8 @@ func main() {
 		AddCommand(httpstat.GetHttpCmd(cCtx)).
 		AddCommand(psutil.GetPsUtilCmd(cCtx)).
 		AddCommand(gops.GetGoPsCmd(cCtx)).
-		AddCommand(version.GetVersionCmd(cCtx))
+		AddCommand(version.GetVersionCmd(cCtx)).
+		AddCommand(udp.GetCmd(cCtx))
 	if err := cmdRegister.Execute(); err != nil {
 		fmt.Println(err)
 	}

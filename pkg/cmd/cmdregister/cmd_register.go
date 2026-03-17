@@ -57,6 +57,7 @@ func (n *NexaCommand) AddCommand(cmd []*cobra.Command) *NexaCommand {
 
 // Execute 执行命令行程序
 func (n *NexaCommand) Execute() error {
+
 	if err := n.cmd.Execute(); err != nil {
 		return err
 	}

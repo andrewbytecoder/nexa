@@ -4,7 +4,7 @@ services:
   nexa-app:
     # TODO: 请替换为你的实际镜像地址
     image: nexa/nexa:v1.0.0.0
-    container_name: nexa-app-container
+    container_name: nexa-kcp-container
     # 重启策略：容器退出或 Docker 重启时自动启动
     restart: always
     # 启动命令参数 (对应 K8s 的 args)
