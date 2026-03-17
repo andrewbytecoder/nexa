@@ -1,11 +1,16 @@
 package httpbin
 
 import (
+	"fmt"
 	"net/http"
+	"runtime"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/gops/agent"
 	"github.com/nexa/pkg/ctx"
+	"github.com/nexa/pkg/utils"
+	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
@@ -99,8 +104,18 @@ type DefaultParams struct {
 // request, which can be used for logging, instrumentation, etc
 
 type RequestConfig struct {
+	// http port
+	Port int
+	// https port
+	HttpsPort int
+
+	certPath string
+	certFile string
+	keyFile  string
+
 	// Max size of an incoming request or generated response body, in bytes
 	MaxBodySize int64
+
 	// Max duration of a request, for those requests that allow user control
 	// over timing (e.g. /delay)
 	MaxDuration time.Duration
@@ -127,8 +142,69 @@ func New(ctx *ctx.Ctx) *HttpBin {
 	}
 }
 
+func (httpBin *HttpBin) ParseFlags(cmd *cobra.Command) {
+	cmd.Flags().IntVarP(&httpBin.Port, "http-port", "p", 8080, "HTTP port")
+	cmd.Flags().IntVarP(&httpBin.HttpsPort, "https-port", "s", 8443, "HTTPS port")
+	cmd.Flags().StringVarP(&httpBin.certPath, "cert-path", "c", "", "cert path")
+}
+
 func (h *HttpBin) StartServer() {
+	// 创建路由引擎
 	h.g = gin.Default()
+	// 添加路由
+	h.AddRouters()
+
+	if err := agent.Listen(agent.Options{}); err != nil {
+		h.logger.Error("Failed to start gops agent", zap.Error(err))
+		return
+	}
+
+	go func() {
+		//	 启动http服务
+		h.logger.Info("httpbin is ready to serve requests", zap.Int("port", h.Port))
+		err := h.Run(fmt.Sprintf(":%d", h.Port))
+		if err != nil {
+			return
+		}
+	}()
+	// 启动https服务
+	h.logger.Info("httpbin is ready to serve requests", zap.Int("port", h.HttpsPort))
+
+	certfile, keyfile := h.GetCertFiles()
+	err := h.RunTLS(fmt.Sprintf(":%d", h.HttpsPort), certfile, keyfile)
+	if err != nil {
+		h.logger.Error("Failed to start https server", zap.Error(err))
+		return
+	}
+}
+
+func (h *HttpBin) Run(addr string) error {
+	return h.g.Run(addr)
+}
+
+func (h *HttpBin) RunTLS(addr string, certFile string, keyFile string) error {
+	return h.g.RunTLS(addr, certFile, keyFile)
+}
+
+func (h *HttpBin) GetCertFiles() (string, string) {
+	var certFile, keyFile string
+
+	certPath := utils.CleanPathSuffix(h.certPath, "/")
+
+	if certPath == "" {
+		if runtime.GOOS == "windows" {
+			certFile = "server.crt"
+			keyFile = "server.key"
+		} else {
+			certFile = "/home/nexa/certs/server.crt"
+			keyFile = "/home/nexa/certs/server.key"
+		}
+	} else {
+		certFile = certPath + "/server.crt"
+		keyFile = certPath + "/server.key"
+	}
+
+	return certFile, keyFile
 }
 
 func (h *HttpBin) AddRouters() {
@@ -176,5 +252,27 @@ func (h *HttpBin) AddRouters() {
 	g.Any("/image/{kind}", h.Image)
 	g.Any("/ip", h.IP)
 	g.Any("/json", h.JSON)
+	g.Any("/links/{numLinks}", h.Links)
+	g.Any("/links/{numLinks}/{offset}", h.Links)
+	g.Any("/range/{numBytes}", h.Range)
+	g.Any("/redirect-to", h.RedirectTo)
+	g.Any("/redirect/{numRedirects}", h.Redirect)
+	g.Any("/relative-redirect/{numRedirects}", h.RelativeRedirect)
+	g.Any("/response-headers", h.ResponseHeaders)
+	g.Any("/robots.txt", h.Robots)
+	g.Any("/sse", h.SSE)
+	g.Any("/status/{code}", h.Status)
+	g.Any("/stream-bytes/{numBytes}", h.StreamBytes)
+	g.Any("/stream/{numEvents}", h.Stream)
+	g.Any("/trailers", h.Trailers)
+	g.Any("/unstable", h.Unstable)
+	g.Any("POST /upload", h.RequestWithBodyDiscard)
+	g.Any("PUT /upload", h.RequestWithBodyDiscard)
+	g.Any("PATCH /upload", h.RequestWithBodyDiscard)
+	g.Any("/user-agent", h.UserAgent)
+	g.Any("/uuid", h.UUID)
+	g.Any("/xml", h.XML)
 
+	// existing httpbin endpoints that we do not support
+	g.Any("/brotli", notImplementedHandler)
 }

@@ -1,6 +1,7 @@
 package httpbin
 
 import (
+	crypto_rand "crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -242,4 +244,173 @@ func encodeServerTimings(timings []serverTiming) string {
 		entries[i] = fmt.Sprintf("%s;dur=%0.2f;desc=\"%s\"", t.name, ms, t.desc)
 	}
 	return strings.Join(entries, ", ")
+}
+
+// syntheticByteStream implements the ReadSeeker interface to allow reading
+// arbitrary subsets of bytes up to a maximum size given a function for
+// generating the byte at a given offset.
+type syntheticByteStream struct {
+	mu sync.Mutex
+
+	size         int64
+	factory      func(int64) byte
+	pausePerByte time.Duration
+
+	// internal offset for tracking the current position in the stream
+	offset int64
+}
+
+// newSyntheticByteStream returns a new stream of bytes of a specific size,
+// given a factory function for generating the byte at a given offset.
+func newSyntheticByteStream(size int64, duration time.Duration, factory func(int64) byte) io.ReadSeeker {
+	return &syntheticByteStream{
+		size:         size,
+		pausePerByte: duration / time.Duration(size),
+		factory:      factory,
+	}
+}
+
+// Read implements the Reader interface for syntheticByteStream
+func (s *syntheticByteStream) Read(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	start := s.offset
+	end := start + int64(len(p))
+	var err error
+	if end >= s.size {
+		err = io.EOF
+		end = s.size
+	}
+
+	for idx := start; idx < end; idx++ {
+		p[idx-start] = s.factory(idx)
+	}
+	s.offset = end
+
+	if s.pausePerByte > 0 {
+		time.Sleep(s.pausePerByte * time.Duration(end-start))
+	}
+
+	return int(end - start), err
+}
+
+// Seek implements the Seeker interface for syntheticByteStream
+func (s *syntheticByteStream) Seek(offset int64, whence int) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	switch whence {
+	case io.SeekStart:
+		s.offset = offset
+	case io.SeekCurrent:
+		s.offset += offset
+	case io.SeekEnd:
+		s.offset = s.size - offset
+	default:
+		return 0, errors.New("Seek: invalid whence")
+	}
+
+	if s.offset < 0 {
+		return 0, errors.New("Seek: invalid offset")
+	}
+
+	return s.offset, nil
+}
+
+// writeServerSentEvent writes the bytes that constitute a single server-sent
+// event message, including both the event type and data.
+func writeServerSentEvent(dst io.Writer, id int, ts time.Time) {
+	dst.Write([]byte("event: ping\n"))
+	dst.Write([]byte("data: "))
+	json.NewEncoder(dst).Encode(serverSentEvent{
+		ID:        id,
+		Timestamp: ts.UnixMilli(),
+	})
+	// each SSE ends with two newlines (\n\n), the first of which is written
+	// automatically by json.NewEncoder().Encode()
+	dst.Write([]byte("\n"))
+}
+
+// weightedChoice represents a choice with its associated weight.
+type weightedChoice[T any] struct {
+	Choice T
+	Weight float64
+}
+
+// parseWeighteChoices parses a comma-separated list of choices in
+// choice:weight format, where weight is an optional floating point number.
+func parseWeightedChoices[T any](rawChoices string, parser func(string) (T, error)) ([]weightedChoice[T], error) {
+	if rawChoices == "" {
+		return nil, nil
+	}
+
+	var (
+		choicePairs = strings.Split(rawChoices, ",")
+		choices     = make([]weightedChoice[T], 0, len(choicePairs))
+		err         error
+	)
+	for _, choicePair := range choicePairs {
+		weight := 1.0
+		rawChoice, rawWeight, found := strings.Cut(choicePair, ":")
+		if found {
+			weight, err = strconv.ParseFloat(rawWeight, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid weight value: %q", rawWeight)
+			}
+		}
+		choice, err := parser(rawChoice)
+		if err != nil {
+			return nil, fmt.Errorf("invalid choice value: %q", rawChoice)
+		}
+		choices = append(choices, weightedChoice[T]{Choice: choice, Weight: weight})
+	}
+	return choices, nil
+}
+
+// weightedRandomChoice returns a randomly chosen element from the weighted
+// choices, given as a slice of "choice:weight" strings where weight is a
+// floating point number. Weights do not need to sum to 1.
+func weightedRandomChoice[T any](choices []weightedChoice[T]) T {
+	// Calculate total weight
+	var totalWeight float64
+	for _, wc := range choices {
+		totalWeight += wc.Weight
+	}
+	randomNumber := rand.Float64() * totalWeight
+	currentWeight := 0.0
+	for _, wc := range choices {
+		currentWeight += wc.Weight
+		if randomNumber < currentWeight {
+			return wc.Choice
+		}
+	}
+	panic("failed to select a weighted random choice")
+}
+
+// set of keys that may not be specified in trailers, per
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Trailer#directives
+var forbiddenTrailers = map[string]struct{}{
+	http.CanonicalHeaderKey("Authorization"):     {},
+	http.CanonicalHeaderKey("Cache-Control"):     {},
+	http.CanonicalHeaderKey("Content-Encoding"):  {},
+	http.CanonicalHeaderKey("Content-Length"):    {},
+	http.CanonicalHeaderKey("Content-Range"):     {},
+	http.CanonicalHeaderKey("Content-Type"):      {},
+	http.CanonicalHeaderKey("Host"):              {},
+	http.CanonicalHeaderKey("Max-Forwards"):      {},
+	http.CanonicalHeaderKey("Set-Cookie"):        {},
+	http.CanonicalHeaderKey("TE"):                {},
+	http.CanonicalHeaderKey("Trailer"):           {},
+	http.CanonicalHeaderKey("Transfer-Encoding"): {},
+}
+
+func uuidv4() string {
+	buff := make([]byte, 16)
+	if _, err := crypto_rand.Read(buff[:]); err != nil {
+		panic(err)
+	}
+	buff[6] = (buff[6] & 0x0f) | 0x40 // Version 4
+	buff[8] = (buff[8] & 0x3f) | 0x80 // Variant 10
+	return fmt.Sprintf("%x-%x-%x-%x-%x", buff[0:4], buff[4:6], buff[6:8], buff[8:10], buff[10:])
 }

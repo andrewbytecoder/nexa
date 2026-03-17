@@ -108,8 +108,9 @@ github.com/goccy/go-yaml/parser
 github.com/goccy/go-yaml/printer
 github.com/goccy/go-yaml/scanner
 github.com/goccy/go-yaml/token
-# github.com/google/gops v0.3.28
-## explicit; go 1.17
+# github.com/google/gops v0.3.29
+## explicit; go 1.18
+github.com/google/gops/agent
 github.com/google/gops/goprocess
 github.com/google/gops/internal
 github.com/google/gops/signal
@@ -191,8 +192,8 @@ github.com/quic-go/quic-go/quicvarint
 # github.com/rivo/uniseg v0.2.0
 ## explicit; go 1.12
 github.com/rivo/uniseg
-# github.com/shirou/gopsutil/v3 v3.23.7
-## explicit; go 1.15
+# github.com/shirou/gopsutil/v3 v3.24.5
+## explicit; go 1.18
 github.com/shirou/gopsutil/v3/common
 github.com/shirou/gopsutil/v3/cpu
 github.com/shirou/gopsutil/v3/internal/common

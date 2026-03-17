@@ -5,9 +5,9 @@ go 1.24.2
 require (
 	github.com/fatih/color v1.18.0
 	github.com/gin-gonic/gin v1.11.0
-	github.com/google/gops v0.3.28
+	github.com/google/gops v0.3.29
 	github.com/olekukonko/tablewriter v1.0.9
-	github.com/shirou/gopsutil/v3 v3.23.7
+	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/shirou/gopsutil/v4 v4.25.7
 	github.com/spf13/cobra v1.9.1
 	github.com/xlab/treeprint v1.2.0

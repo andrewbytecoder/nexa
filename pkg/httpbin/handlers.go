@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"compress/zlib"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"html"
 	"io"
@@ -852,4 +853,572 @@ func (h *HttpBin) JSON(c *gin.Context) {
 		URL:     getURL(c.Request).String(),
 		JSON:    mustStaticAsset("sample.json"),
 	})
+}
+
+// Links redirects to the first page in a series of N links
+func (h *HttpBin) Links(c *gin.Context) {
+	n, er := strconv.Atoi(c.Param("numLinks"))
+	if er != nil {
+		writeError(c, http.StatusBadRequest, er)
+		return
+	} else if n < 0 || n > 256 {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("numLinks must be between 0 and 256"))
+		return
+	}
+
+	// Are we handling /links/<n>/<offset>? If so, render an HTML page
+	if rawOffset := c.Param("offset"); rawOffset != "" {
+		offset, er := strconv.Atoi(rawOffset)
+		if er != nil {
+			writeError(c, http.StatusBadRequest, er)
+			return
+		}
+
+		h.doLinksPage(c, n, offset)
+	}
+
+	// Otherwise, redirect from /links/<n> to /links/<n>/0
+	c.Request.URL.Path = c.Request.URL.Path + "/0"
+	h.doRedirectGin(c, c.Request.URL.String(), http.StatusFound)
+}
+
+// doLinksPage renders a page with a series of N links
+func (h *HttpBin) doLinksPage(c *gin.Context, n int, offset int) {
+	c.Header("Content-Type", htmlContentType)
+	c.Status(http.StatusOK)
+
+	_, err := c.Writer.Write([]byte("<html><head><title>Links</title></head><body>"))
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, err)
+		return
+	}
+	for i := range n {
+		if i == offset {
+			fmt.Fprintf(c.Writer, "%d ", i)
+		} else {
+			fmt.Fprintf(c.Writer, `<a href="%s/links/%d/%d">%d</a> `, h.prefix, n, i, i)
+		}
+	}
+	c.Writer.Write([]byte("</body></html>"))
+}
+
+// doRedirect set redirect header using Gin
+func (h *HttpBin) doRedirectGin(c *gin.Context, path string, code int) {
+	var sb strings.Builder
+	if strings.HasPrefix(path, "/") && !strings.HasPrefix(path, "//") {
+		sb.WriteString(h.prefix)
+	}
+	sb.WriteString(path)
+	c.Redirect(code, sb.String())
+}
+
+// Range returns up to N bytes, with support for HTTP Range requests.
+//
+// This departs from original httpbin in a few ways:
+//
+//   - param `chunk_size` IS NOT supported
+//
+//   - param `duration` IS supported, but functions more as a delay before the
+//     whole response is written
+//
+//   - multiple ranges ARE correctly supported (i.e. `Range: bytes=0-1,2-3`
+//     will return a multipart/byteranges response)
+//
+// Most of the heavy lifting is done by the stdlib's http.ServeContent, which
+// handles range requests automatically. Supporting chunk sizes would require
+// an extensive reimplementation, especially to support multiple ranges for
+// correctness. For now, we choose not to take that work on.
+func (h *HttpBin) Range(c *gin.Context) {
+	numBytes, err := strconv.ParseInt(c.Param("numBytes"), 10, 64)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+
+	var duration time.Duration
+	if durationVal := c.Query("duration"); durationVal != "" {
+		duration, err = parseBoundedDuration(durationVal, 0, h.MaxDuration)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err)
+			return
+		}
+	}
+
+	c.Header("ETag", fmt.Sprintf("range%d", numBytes))
+	c.Header("Accept-Ranges", "bytes")
+
+	if numBytes <= 0 || numBytes > h.MaxBodySize {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("numBytes must be between 1 and %d", h.MaxBodySize))
+		return
+	}
+
+	content := newSyntheticByteStream(numBytes, duration, func(offset int64) byte {
+		return byte(97 + (offset % 26))
+	})
+
+	var modtime time.Time
+	http.ServeContent(c.Writer, c.Request, "", modtime, content)
+}
+
+// RedirectTo responds with a redirect to a specific URL with an optional
+// status code, which defaults to 302
+func (h *HttpBin) RedirectTo(c *gin.Context) {
+	inputUrl := c.Query("url")
+	if inputUrl == "" {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("url parameter is required"))
+		return
+	}
+
+	u, err := url.Parse(inputUrl)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+
+	// If we're given a URL that includes a domain name and we have a list of
+	// allowed domains, ensure that the domain is allowed.
+	//
+	// Note: This checks the hostname directly rather than using the net.URL's
+	// IsAbs() method, because IsAbs() will return false for URLs that omit
+	// the scheme but include a domain name, like "//evil.com" and it's
+	// important that we validate the domain in these cases as well.
+	if u.Hostname() != "" && len(h.AllowedRedirectDomains) > 0 {
+		if _, ok := h.AllowedRedirectDomains[u.Hostname()]; !ok {
+			writeError(c, http.StatusForbidden, fmt.Errorf("redirect URL is not allowed"))
+			return
+		}
+	}
+
+	statusCode := http.StatusFound
+	if rawStatusCode := c.Query("status_code"); rawStatusCode != "" {
+		statusCode, err = parseBoundedStatusCode(rawStatusCode, http.StatusOK, http.StatusPermanentRedirect)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err)
+			return
+		}
+	}
+
+	h.doRedirectGin(c, u.String(), statusCode)
+}
+
+// Redirect responds with 302 redirect a given number of times. Defaults to a
+// relative redirect, but an ?absolute=true query param will trigger an
+// absolute redirect.
+func (h *HttpBin) Redirect(c *gin.Context) {
+	relative := c.Query("absolute") != "true"
+	h.handleRedirect(c, relative)
+}
+
+// RelativeRedirect responds with an HTTP 302 redirect a given number of times
+func (h *HttpBin) RelativeRedirect(c *gin.Context) {
+	h.handleRedirect(c, true)
+}
+
+// ResponseHeaders sets every incoming query parameter as a response header and
+// returns the headers serialized as JSON.
+//
+// If the Content-Type query parameter is given and set to a "dangerous" value
+// (i.e. one that might be rendered as HTML in a web browser), the keys and
+// values in the JSON response body will be escaped.
+func (h *HttpBin) ResponseHeaders(c *gin.Context) {
+	// only set our own content type if one was not already set based on
+	// incoming request params
+	contentType := c.Query("content-type")
+	if contentType == "" {
+		c.Header("Content-Type", jsonContentType)
+	}
+
+	// actual HTTP response headers are not escaped, regardless of content type
+	// (unlike the JSON serialized representation of those headers in the
+	// response body, which MAY be escaped based on content type)
+	for k, vs := range getRequestHeaders(c, h.excludeHeadersProcessor) {
+		for _, v := range vs {
+			c.Header(k, v)
+		}
+	}
+
+	// if response content type is dangrous, escape keys and values before
+	// serializing response body
+	if h.mustEscapeResponse(contentType) {
+		tmp := make(url.Values, len(c.Request.URL.Query()))
+		for k, vs := range c.Request.URL.Query() {
+			for _, v := range vs {
+				tmp.Add(html.EscapeString(k), html.EscapeString(v))
+			}
+		}
+		mustMarshalJSON(c.Writer, tmp)
+	} else {
+		mustMarshalJSON(c.Writer, c.Request.URL.Query())
+	}
+}
+
+// Robots renders a basic robots.txt file
+func (h *HttpBin) Robots(c *gin.Context) {
+	robotsTxt := []byte(`User-agent: *Disallow: /deny`)
+	writeResponse(c, http.StatusOK, textContentType, robotsTxt)
+}
+
+// SSE writes a stream of events over a duration after an optional
+// initial delay.
+func (h *HttpBin) SSE(c *gin.Context) {
+	start := time.Now()
+	var (
+		count    = h.DefaultParams.SSECount
+		delay    = h.DefaultParams.SSEDelay
+		duration = h.DefaultParams.SSEDuration
+		err      error
+	)
+
+	if userCount := c.Query("count"); userCount != "" {
+		count, err = strconv.Atoi(userCount)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err)
+			return
+		}
+		if count < 1 || int64(count) > h.maxSSECount {
+			writeError(c, http.StatusBadRequest, fmt.Errorf("count must be between 1 and %d", h.maxSSECount))
+			return
+		}
+	}
+
+	if userDuration := c.Query("duration"); userDuration != "" {
+		duration, err = parseBoundedDuration(userDuration, 1, h.MaxDuration)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err)
+			return
+		}
+	}
+
+	if userDelay := c.Query("delay"); userDelay != "" {
+		delay, err = parseBoundedDuration(userDelay, 0, h.MaxDuration)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err)
+			return
+		}
+	}
+
+	if duration+delay > h.MaxDuration {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("delay and duration combined must be less than %s", h.MaxDuration))
+		return
+	}
+
+	pause := duration
+	if count > 1 {
+		// compensate for lack of pause after final write (i.e. if we're
+		// writing 10 events, we will only pause 9 times)
+		pause = duration / time.Duration(count-1)
+	}
+
+	// Initial delay before we send any response data
+	if delay > 0 {
+		select {
+		case <-time.After(delay):
+		// ok
+		case <-c.Request.Context().Done():
+			c.Status(499) // "Client Closed Request" https://httpstatuses.com/499
+		}
+	}
+
+	c.Header("Trailer", "Server-Timing")
+	defer func() {
+		c.Header("Server-Timing", encodeServerTimings([]serverTiming{
+			{"total_duration", time.Since(start), "total request duration"},
+			{"initial_delay", delay, "initial delay"},
+			{"write_duration", duration, "duration of writes after initial delay"},
+			{"pause_per_write", pause, "computed pause between writes"},
+		}))
+	}()
+
+	c.Header("Content-Type", sseContentType)
+	c.Status(http.StatusOK)
+
+	// special case when we only have one event to write
+	if count == 1 {
+		writeServerSentEvent(c.Writer, 0, time.Now())
+		c.Writer.Flush()
+		return
+	}
+
+	ticker := time.NewTicker(pause)
+	defer ticker.Stop()
+
+	for i := 0; i < count; i++ {
+		writeServerSentEvent(c.Writer, i, time.Now())
+		c.Writer.Flush()
+
+		// don't pause after last byte
+		if i == count-1 {
+			return
+		}
+
+		select {
+		case <-ticker.C:
+			// ok
+		case <-c.Request.Context().Done():
+			return
+		}
+	}
+}
+
+// Status responds with the specified status code. TODO: support random choice
+// from multiple, optionally weighted status codes.
+func (h *HttpBin) Status(c *gin.Context) {
+	rawStatus := c.Param("status")
+
+	// simple case, specific status code is requested
+	if !strings.Contains(rawStatus, ",") {
+		statusCode, err := parseStatusCode(rawStatus)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, err)
+			return
+		}
+		h.doStatus(c, statusCode)
+		return
+	}
+
+	// complex case, make a weighted choice from multiple status codes
+	choices, err := parseWeightedChoices(rawStatus, strconv.Atoi)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	choice := weightedRandomChoice(choices)
+	h.doStatus(c, choice)
+}
+
+func (h *HttpBin) doStatus(c *gin.Context, statusCode int) {
+	// default to plain text content type, which may be overriden by headers
+	// for special cases
+	c.Header("Content-Type", textContentType)
+	if specialCase, ok := h.statusSpecialCases[statusCode]; ok {
+		for key, val := range specialCase.headers {
+			c.Header(key, val)
+		}
+		c.Status(statusCode)
+		if specialCase.body != nil {
+			c.Writer.Write(specialCase.body)
+		}
+		return
+	}
+	c.Status(statusCode)
+}
+
+// StreamBytes streams N random bytes generated with an optional seed in chunks
+// of a given size.
+func (h *HttpBin) StreamBytes(c *gin.Context) {}
+
+// handleBytes consolidates the logic for validating input params of the Bytes
+// and StreamBytes endpoints and knows how to write the response in chunks if
+// streaming is true.
+func (h *HttpBin) handleBytes(c *gin.Context, streaming bool) {
+	numBytes, err := strconv.Atoi(c.Param("numBytes"))
+	if err != nil {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("invalid number of bytes: %q: %w", c.Param("numBytes"), err))
+		return
+	}
+
+	// rng/seed
+	rng, err := parseSeed(c.Query("seed"))
+	if err != nil {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("invalid seed: %q: %w", c.Query("seed"), err))
+		return
+	}
+
+	if numBytes < 0 {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("number of bytes must be positive"))
+		return
+	}
+
+	// Special case 0 bytes and exit early, since streaming & chunk size do not
+	// matter here.
+	if numBytes == 0 {
+		c.Header("Content-Type", "0")
+		c.Status(http.StatusOK)
+		return
+	}
+
+	if numBytes > int(h.MaxBodySize) {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("number of bytes must be less than %d", h.MaxBodySize))
+		return
+	}
+
+	var chunkSize int
+	var write func([]byte)
+
+	if streaming {
+		if c.Query("chunk_size") != "" {
+			chunkSize, err = strconv.Atoi(c.Query("chunk_size"))
+			if err != nil {
+				writeError(c, http.StatusBadRequest, fmt.Errorf("invalid chunk size: %q: %w", c.Query("chunk_size"), err))
+				return
+			}
+		} else {
+			chunkSize = 10 * 1024
+		}
+		write = func() func(chunk []byte) {
+			return func(chunk []byte) {
+				c.Writer.Write(chunk)
+				c.Writer.Flush()
+			}
+		}()
+	} else {
+		// if not streaming, we will write the whole response at once
+		chunkSize = numBytes
+		c.Header("Content-Type", strconv.Itoa(chunkSize))
+		write = func(chunk []byte) {
+			c.Writer.Write(chunk)
+		}
+	}
+
+	c.Header("Content-Type", binaryContentType)
+	c.Status(http.StatusOK)
+
+	var chunk []byte
+	for i := 0; i < numBytes; i++ {
+		chunk = append(chunk, byte(rng.Intn(256)))
+		if len(chunk) == chunkSize {
+			write(chunk)
+			chunk = nil
+		}
+	}
+	if len(chunk) > 0 {
+		write(chunk)
+	}
+}
+
+// Stream responds with max(n, 100) lines of JSON-encoded request data.
+func (h *HttpBin) Stream(c *gin.Context) {
+	n, err := strconv.Atoi(c.Param("numLines"))
+	if err != nil {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("invalid number of lines: %q: %w", c.Param("numLines"), err))
+		return
+	}
+
+	if n > 100 {
+		n = 100
+	} else if n < 1 {
+		n = 1
+	}
+
+	resp := &streamResponse{
+		Args:    c.Request.URL.Query(),
+		Headers: getRequestHeaders(c, h.excludeHeadersProcessor),
+		Origin:  c.ClientIP(),
+		URL:     c.Request.URL.String(),
+	}
+
+	for i := 0; i < n; i++ {
+		resp.ID = i
+		//	 Call json.Marshal directly to avoid pretty printing
+		line, _ := json.Marshal(resp)
+		c.Writer.Write(append(line, '\n'))
+		c.Writer.Flush()
+	}
+}
+
+// Trailers adds the header keys and values specified in the request's query
+// parameters as HTTP trailers in the response.
+//
+// Trailers are returned in canonical form. Any forbidden trailer will result
+// in an error.
+func (h *HttpBin) Trailers(c *gin.Context) {
+	// ensure all requested trailers are allowed
+	for k := range c.Request.URL.Query() {
+		if _, found := forbiddenTrailers[http.CanonicalHeaderKey(k)]; found {
+			writeError(c, http.StatusBadRequest, fmt.Errorf("forbidden trailer: %q", k))
+			return
+		}
+	}
+
+	for k := range c.Request.URL.Query() {
+		c.Header("Tailer", k)
+	}
+
+	h.RequestWithBody(c)
+	c.Writer.Flush()
+
+	for k, vs := range c.Request.Trailer {
+		for _, v := range vs {
+			c.Header(k, v)
+		}
+	}
+}
+
+// Unstable - returns 500, sometimes
+func (h *HttpBin) Unstable(c *gin.Context) {
+	var err error
+
+	// rng/seed
+	rng, err := parseSeed(c.Query("seed"))
+	if err != nil {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("invalid seed: %q: %w", c.Query("seed"), err))
+		return
+	}
+
+	//	 failure_rate
+	failureRate := 0.5
+	if rawFailureRate := c.Query("failure_rate"); rawFailureRate != "" {
+		failureRate, err = strconv.ParseFloat(rawFailureRate, 64)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, fmt.Errorf("invalid failure rate: %q: %w", rawFailureRate, err))
+			return
+		} else if failureRate < 0 || failureRate > 1 {
+			writeError(c, http.StatusBadRequest, fmt.Errorf("invalid failure rate: %q: %w", rawFailureRate, err))
+			return
+		}
+	}
+
+	status := http.StatusOK
+	if rng.Float64() < failureRate {
+		status = http.StatusInternalServerError
+	}
+
+	c.Header("Content-Type", textContentType)
+	c.Status(status)
+}
+
+// RequestWithBodyDiscard handles POST, PUT, and PATCH requests by responding with a
+// JSON representation of the incoming request without body data
+func (h *HttpBin) RequestWithBodyDiscard(c *gin.Context) {
+	resp := &discardedBodyResponse{
+		noBodyResponse: noBodyResponse{
+			Args:    c.Request.URL.Query(),
+			Headers: getRequestHeaders(c, h.excludeHeadersProcessor),
+			Method:  c.Request.Method,
+			Origin:  c.ClientIP(),
+			URL:     c.Request.URL.String(),
+		},
+	}
+
+	n, err := io.Copy(io.Discard, c.Request.Body)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, fmt.Errorf("failed to read request body: %w", err))
+		return
+	}
+
+	resp.BytesReceived = n
+	writeJSON(c, http.StatusOK, resp)
+}
+
+// UserAgent echoes the incoming User-Agent header
+func (h *HttpBin) UserAgent(c *gin.Context) {
+	writeJSON(c, http.StatusOK, &userAgentResponse{
+		UserAgent: c.Request.UserAgent(),
+	})
+}
+
+// UUID - responds with a generated UUID
+func (h *HttpBin) UUID(c *gin.Context) {
+	writeJSON(c, http.StatusOK, &uuidResponse{
+		UUID: uuidv4(),
+	})
+}
+
+// XML responds with an XML document
+func (h *HttpBin) XML(c *gin.Context) {
+	writeResponse(c, http.StatusOK, "application/xml", mustStaticAsset("sample.xml"))
+}
+
+func notImplementedHandler(c *gin.Context) {
+	writeError(c, http.StatusNotImplemented, nil)
 }

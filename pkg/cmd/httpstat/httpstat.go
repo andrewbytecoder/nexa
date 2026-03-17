@@ -2,6 +2,7 @@ package httpstat
 
 import (
 	"github.com/nexa/pkg/ctx"
+	"github.com/nexa/pkg/httpbin"
 	httpstat "github.com/nexa/pkg/net/httpstat"
 	"github.com/spf13/cobra"
 )
@@ -9,6 +10,7 @@ import (
 func GetHttpCmd(ctx *ctx.Ctx) []*cobra.Command {
 	var cmds []*cobra.Command
 	cmds = append(cmds, newCmdHttpStat(ctx))
+	cmds = append(cmds, newCmdHttpBinStat(ctx))
 
 	return cmds
 }
@@ -39,13 +41,13 @@ func newCmdHttpStat(ctx *ctx.Ctx) *cobra.Command {
 
 // newCmdHttpStat returns a cobra command for fetching versions
 func newCmdHttpBinStat(ctx *ctx.Ctx) *cobra.Command {
-	httpStat := httpstat.NewHttpStat(ctx)
+	httpBin := httpbin.New(ctx)
 
 	cmd := &cobra.Command{
-		Use:     "httpstat",
-		Short:   "nexa httpstat url",
-		Long:    `nexa httpstat url -X GET.`,
-		Example: `nexa httpstat www.google.com -X GET -H "Accept: application/json, text/plain, */*"`,
+		Use:     "httpbin",
+		Short:   "nexa httpbin",
+		Long:    `nexa httpbin --http-port=8080 --https-port=8443 --cert-path=/home/nexa/certs`,
+		Example: `nexa httpbin --http-port=8080 --https-port=8443 --cert-path=/home/nexa/certs`,
 		// stop printing usage when the command errors
 		SilenceUsage: true,
 	}
@@ -54,9 +56,9 @@ func newCmdHttpBinStat(ctx *ctx.Ctx) *cobra.Command {
 			cmd.Help()
 			return
 		}
-		httpStat.RunHttpStat(args[0])
+		httpBin.StartServer()
 	}
 
-	httpStat.ParseFlags(cmd)
+	httpBin.ParseFlags(cmd)
 	return cmd
 }
