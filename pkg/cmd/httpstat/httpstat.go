@@ -52,10 +52,6 @@ func newCmdHttpBinStat(ctx *ctx.Ctx) *cobra.Command {
 		SilenceUsage: true,
 	}
 	cmd.Run = func(cmd *cobra.Command, args []string) {
-		if len(args) == 0 {
-			cmd.Help()
-			return
-		}
 		httpBin.StartServer()
 	}
 

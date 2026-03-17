@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexa-app-deployment
+  labels:
+    app: nexa-app
+spec:
+  replicas: 2  # 建议至少 2 个副本以保证高可用
+  selector:
+    matchLabels:
+      app: nexa-app
+  template:
+    metadata:
+      labels:
+        app: nexa-app
+    spec:
+      containers:
+        - name: nexa-container
+          # TODO: 请替换为你的实际镜像地址
+          image: nexa/nexa:v1.0.0.0
+          imagePullPolicy: IfNotPresent
+
+          # 启动参数配置
+          args:
+            - "httpbin"
+            - "--http-port=8080"
+            - "--https-port=8443"
+            - "--cert-path=/home/nexa/certs"
+
+          # 端口定义 (用于 Service 发现和健康检查)
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+
+          # 资源限制 (可选，生产环境建议配置)
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+          # 健康检查 (根据实际业务调整路径)
+          livenessProbe:
+            httpGet:
+              path: /healthz # 请替换为实际的健康检查路径
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready # 请替换为实际的就绪检查路径
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5

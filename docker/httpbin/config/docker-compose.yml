@@ -1,0 +1,41 @@
+version: '3.2'
+
+services:
+  nexa-app:
+    # TODO: 请替换为你的实际镜像地址
+    image: nexa/nexa:v1.0.0.0
+    container_name: nexa-app-container
+    # 重启策略：容器退出或 Docker 重启时自动启动
+    restart: always
+    # 启动命令参数 (对应 K8s 的 args)
+    # 注意：docker-compose 中 command 覆盖镜像的 ENTRYPOINT/CMD
+    command:
+      - "httpbin"
+      - "--http-port=8080"
+      - "--https-port=8443"
+      - "--cert-path=/home/nexa/certs"
+
+    # 端口映射 (宿主机端口:容器端口)
+    ports:
+      - "8080:8080"   # HTTP 访问
+      - "8443:8443"   # HTTPS 访问
+
+    # 环境变量 (如果需要额外配置，可在此添加)
+    environment:
+      - TZ=Asia/Shanghai
+
+    # 资源限制 (可选，防止占用过多资源)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+# 定义网络 (可选，默认会使用 default 桥接网络)
+networks:
+  default:
+    name: nexa-network
+    driver: bridge
