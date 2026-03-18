@@ -3,13 +3,13 @@ package main
 import (
 	"fmt"
 
-	"github.com/nexa/pkg/cmd/cmdregister"
-	"github.com/nexa/pkg/cmd/gops"
-	"github.com/nexa/pkg/cmd/httpstat"
-	"github.com/nexa/pkg/cmd/psutil"
-	"github.com/nexa/pkg/cmd/udp"
-	"github.com/nexa/pkg/cmd/version"
 	"github.com/nexa/pkg/ctx"
+	"github.com/nexa/pkg/register/cmdregister"
+	"github.com/nexa/pkg/register/gops"
+	"github.com/nexa/pkg/register/httpstat"
+	"github.com/nexa/pkg/register/psutil"
+	"github.com/nexa/pkg/register/udp"
+	"github.com/nexa/pkg/register/version"
 )
 
 func main() {

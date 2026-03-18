@@ -23,7 +23,7 @@ func newCmd(ctx *ctx.Ctx) *cobra.Command {
 		Use:   "gops",
 		Short: "gops is a tool to list and diagnose Go processes.",
 		Long:  `nexa gops [command].`,
-		Example: `nexa gops <cmd> <pid|addr> ...
+		Example: `nexa gops <register> <pid|addr> ...
 		gops <pid> # displays process info
 		gops help  # displays this help message`,
 		// stop printing usage when the command errors

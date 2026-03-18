@@ -140,7 +140,7 @@ func processInfo(pid int, period time.Duration) {
 		fmt.Printf("username:\t%v\n", v)
 	}
 	if v, err := p.Cmdline(); err == nil {
-		fmt.Printf("cmd+args:\t%v\n", v)
+		fmt.Printf("register+args:\t%v\n", v)
 	}
 	if v, err := elapsedTime(p); err == nil {
 		fmt.Printf("elapsed time:\t%v\n", v)
