@@ -1,5 +1,7 @@
 FROM alpine:V0.0.00.002-openshift
 
+LABEL org.opencontainers.image.source https://github.com/andrewbytecoder/nexa
+
 RUN groupadd -g 2030 nexagroup && useradd -u 2030 -g nexagroup nexa -d /home/nexa -m
 
 ENV APP_ROOT=/home/nexa

@@ -58,3 +58,7 @@ func (c *Ctx) Logger() *zap.Logger {
 func (c *Ctx) Context() context.Context {
 	return c.ctx
 }
+
+func (c *Ctx) Cancel() {
+	c.cancel()
+}
