@@ -6,7 +6,7 @@ import (
 	"github.com/nexa/pkg/ctx"
 	"github.com/nexa/pkg/register/cmdregister"
 	"github.com/nexa/pkg/register/gops"
-	"github.com/nexa/pkg/register/httpstat"
+	"github.com/nexa/pkg/register/net"
 	"github.com/nexa/pkg/register/psutil"
 	"github.com/nexa/pkg/register/udp"
 	"github.com/nexa/pkg/register/version"
@@ -18,7 +18,7 @@ func main() {
 	cCtx := ctx.New()
 	cmdRegister.
 		// 注册http请求命令
-		AddCommand(httpstat.GetHttpCmd(cCtx)).
+		AddCommand(net.Cmd(cCtx)).
 		AddCommand(psutil.GetPsUtilCmd(cCtx)).
 		AddCommand(gops.GetGoPsCmd(cCtx)).
 		AddCommand(version.GetVersionCmd(cCtx)).
