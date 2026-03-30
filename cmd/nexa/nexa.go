@@ -3,18 +3,18 @@ package main
 import (
 	"fmt"
 
+	"github.com/nexa/cmd/nexa/gops"
+	"github.com/nexa/cmd/nexa/helmify"
+	"github.com/nexa/cmd/nexa/net"
+	"github.com/nexa/cmd/nexa/psutil"
+	"github.com/nexa/cmd/nexa/udp"
+	"github.com/nexa/cmd/nexa/version"
 	"github.com/nexa/pkg/ctx"
-	"github.com/nexa/pkg/register/cmdregister"
-	"github.com/nexa/pkg/register/gops"
-	"github.com/nexa/pkg/register/net"
-	"github.com/nexa/pkg/register/psutil"
-	"github.com/nexa/pkg/register/udp"
-	"github.com/nexa/pkg/register/version"
 )
 
 func main() {
 
-	cmdRegister := cmdregister.NewNexaCommand()
+	cmdRegister := NewNexaCommand()
 	cCtx := ctx.New()
 	cmdRegister.
 		// 注册http请求命令
@@ -22,7 +22,8 @@ func main() {
 		AddCommand(psutil.GetPsUtilCmd(cCtx)).
 		AddCommand(gops.GetGoPsCmd(cCtx)).
 		AddCommand(version.GetVersionCmd(cCtx)).
-		AddCommand(udp.GetCmd(cCtx))
+		AddCommand(udp.GetCmd(cCtx)).
+		AddCommand(helmify.GetCmd(cCtx))
 	if err := cmdRegister.Execute(); err != nil {
 		fmt.Println(err)
 	}

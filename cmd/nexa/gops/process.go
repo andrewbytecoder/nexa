@@ -3,7 +3,6 @@ package gops
 import (
 	"bytes"
 	"fmt"
-	"github.com/google/gops/goprocess"
 	"log"
 	"math"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/gops/goprocess"
 
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/spf13/cobra"
