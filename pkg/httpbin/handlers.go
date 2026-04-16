@@ -34,7 +34,9 @@ func parseFiles(fileHeaders map[string][]*multipart.FileHeader) (map[string][]st
 			if err != nil {
 				return nil, err
 			}
+			// close immediately to avoid leaking fds across requests
 			contents, err := io.ReadAll(fh)
+			_ = fh.Close()
 			if err != nil {
 				return nil, err
 			}
@@ -59,6 +61,8 @@ func parseBody(c *gin.Context, resp *bodyResponse) error {
 	if err != nil {
 		return err
 	}
+	// Rewind the body for any downstream parsers (ParseForm, ParseMultipartForm).
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
 
 	// 如果请求体为空，直接返回
 	if len(body) == 0 {
@@ -91,7 +95,7 @@ func parseBody(c *gin.Context, resp *bodyResponse) error {
 
 	case "multipart/form-data":
 		// 解析 multipart 表单数据
-		if err := c.Request.ParseMultipartForm(1024); err != nil {
+		if err := c.Request.ParseMultipartForm(32 << 20); err != nil {
 			return err
 		}
 		resp.Form = c.Request.PostForm
@@ -102,10 +106,12 @@ func parseBody(c *gin.Context, resp *bodyResponse) error {
 		resp.Files = files
 
 	case "application/json":
-		// 绑定 JSON 到结构体
-		if err := c.ShouldBindJSON(&resp.JSON); err != nil {
+		// We already consumed the body via GetRawData, so decode from bytes.
+		var v any
+		if err := json.Unmarshal(body, &v); err != nil {
 			return err
 		}
+		resp.JSON = v
 
 	default:
 		// 未知 Content-Type，编码为 base64 数据 URL
@@ -118,7 +124,7 @@ func parseBody(c *gin.Context, resp *bodyResponse) error {
 func (h *HttpBin) RequestWithBody(c *gin.Context) {
 	resp := &bodyResponse{
 		Args:    c.Request.URL.Query(),
-		Files:   nilValues,
+		Files:   map[string][]string{},
 		Form:    nilValues,
 		Headers: c.Request.Header,
 		Method:  c.Request.Method,
@@ -136,7 +142,19 @@ func (h *HttpBin) RequestWithBody(c *gin.Context) {
 
 func (h *HttpBin) Index(c *gin.Context) {
 	c.Header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' camo.githubusercontent.com")
-	writeJSON(c, http.StatusOK, map[string]string{"message": "Welcome to httpbin"})
+	writeHTML(c, http.StatusOK, mustRenderTemplate("index.html.tmpl", map[string]any{
+		"Prefix": h.prefix,
+	}))
+}
+
+func (h *HttpBin) EncodingUTF8(c *gin.Context) {
+	writeHTML(c, http.StatusOK, mustStaticAsset("utf8.html"))
+}
+
+func (h *HttpBin) FormsPost(c *gin.Context) {
+	writeHTML(c, http.StatusOK, mustRenderTemplate("forms-post.html.tmpl", map[string]any{
+		"Prefix": h.prefix,
+	}))
 }
 
 func (h *HttpBin) Get(c *gin.Context) {
@@ -405,7 +423,7 @@ func (h *HttpBin) HandleBytes(c *gin.Context) {
 
 // Bytes returns N random bytes generated with an optional seed
 func (h *HttpBin) Bytes(c *gin.Context) {
-	h.HandleBytes(c)
+	h.handleBytes(c, false)
 }
 
 // Cache returns a 304 if an If-Modified-Since or an If-None-Match header is
@@ -697,6 +715,9 @@ func (h *HttpBin) DumpRequest(c *gin.Context) {
 
 // Env - returns environment variables with HTTPBIN_ prefix, if any pre-configured by operator
 func (h *HttpBin) Env(c *gin.Context) {
+	if h.env == nil {
+		h.env = make(map[string]string)
+	}
 	envroinment := os.Environ()
 	for _, env := range envroinment {
 		b, a, found := strings.Cut(env, "=")
@@ -717,7 +738,7 @@ func (h *HttpBin) Env(c *gin.Context) {
 func (h *HttpBin) ETag(c *gin.Context) {
 	etag := c.Param("etag")
 	c.Header("ETag", etag)
-	c.Header("Cache-Control", textContentType)
+	c.Header("Cache-Control", "no-cache")
 	var buf bytes.Buffer
 	mustMarshalJSON(&buf, noBodyResponse{
 		Args:    c.Request.URL.Query(),
@@ -832,8 +853,18 @@ func doImage(c *gin.Context, kind string) {
 // ImageAccept responds with an appropriate image based on the Accept header
 func (h *HttpBin) ImageAccept(c *gin.Context) {
 	accept := c.GetHeader("Accept")
-	switch accept {
-
+	accept = strings.ToLower(accept)
+	switch {
+	case strings.Contains(accept, "image/webp"):
+		doImage(c, "webp")
+	case strings.Contains(accept, "image/svg"):
+		doImage(c, "svg")
+	case strings.Contains(accept, "image/png"):
+		doImage(c, "png")
+	case strings.Contains(accept, "image/jpeg") || strings.Contains(accept, "image/jpg"):
+		doImage(c, "jpeg")
+	default:
+		doImage(c, "png")
 	}
 }
 
@@ -1026,12 +1057,15 @@ func (h *HttpBin) ResponseHeaders(c *gin.Context) {
 	contentType := c.Query("content-type")
 	if contentType == "" {
 		c.Header("Content-Type", jsonContentType)
+	} else {
+		c.Header("Content-Type", contentType)
 	}
 
-	// actual HTTP response headers are not escaped, regardless of content type
-	// (unlike the JSON serialized representation of those headers in the
-	// response body, which MAY be escaped based on content type)
-	for k, vs := range getRequestHeaders(c, h.excludeHeadersProcessor) {
+	// Set every incoming query parameter as a response header.
+	for k, vs := range c.Request.URL.Query() {
+		if strings.EqualFold(k, "content-type") {
+			continue
+		}
 		for _, v := range vs {
 			c.Header(k, v)
 		}
@@ -1205,7 +1239,9 @@ func (h *HttpBin) doStatus(c *gin.Context, statusCode int) {
 
 // StreamBytes streams N random bytes generated with an optional seed in chunks
 // of a given size.
-func (h *HttpBin) StreamBytes(c *gin.Context) {}
+func (h *HttpBin) StreamBytes(c *gin.Context) {
+	h.handleBytes(c, true)
+}
 
 // handleBytes consolidates the logic for validating input params of the Bytes
 // and StreamBytes endpoints and knows how to write the response in chunks if
@@ -1232,7 +1268,8 @@ func (h *HttpBin) handleBytes(c *gin.Context, streaming bool) {
 	// Special case 0 bytes and exit early, since streaming & chunk size do not
 	// matter here.
 	if numBytes == 0 {
-		c.Header("Content-Type", "0")
+		c.Header("Content-Type", binaryContentType)
+		c.Header("Content-Length", "0")
 		c.Status(http.StatusOK)
 		return
 	}
@@ -1243,7 +1280,7 @@ func (h *HttpBin) handleBytes(c *gin.Context, streaming bool) {
 	}
 
 	var chunkSize int
-	var write func([]byte)
+	var writeChunk func([]byte) error
 
 	if streaming {
 		if c.Query("chunk_size") != "" {
@@ -1255,18 +1292,25 @@ func (h *HttpBin) handleBytes(c *gin.Context, streaming bool) {
 		} else {
 			chunkSize = 10 * 1024
 		}
-		write = func() func(chunk []byte) {
-			return func(chunk []byte) {
-				c.Writer.Write(chunk)
-				c.Writer.Flush()
+		if chunkSize < 1 || int64(chunkSize) > h.MaxBodySize {
+			writeError(c, http.StatusBadRequest, fmt.Errorf("invalid chunk size: %d not in range [1, %d]", chunkSize, h.MaxBodySize))
+			return
+		}
+		writeChunk = func(chunk []byte) error {
+			_, err := c.Writer.Write(chunk)
+			if err != nil {
+				return err
 			}
-		}()
+			c.Writer.Flush()
+			return nil
+		}
 	} else {
 		// if not streaming, we will write the whole response at once
 		chunkSize = numBytes
-		c.Header("Content-Type", strconv.Itoa(chunkSize))
-		write = func(chunk []byte) {
-			c.Writer.Write(chunk)
+		c.Header("Content-Length", strconv.Itoa(numBytes))
+		writeChunk = func(chunk []byte) error {
+			_, err := c.Writer.Write(chunk)
+			return err
 		}
 	}
 
@@ -1277,12 +1321,14 @@ func (h *HttpBin) handleBytes(c *gin.Context, streaming bool) {
 	for i := 0; i < numBytes; i++ {
 		chunk = append(chunk, byte(rng.Intn(256)))
 		if len(chunk) == chunkSize {
-			write(chunk)
+			if err := writeChunk(chunk); err != nil {
+				return
+			}
 			chunk = nil
 		}
 	}
 	if len(chunk) > 0 {
-		write(chunk)
+		_ = writeChunk(chunk)
 	}
 }
 
@@ -1330,17 +1376,24 @@ func (h *HttpBin) Trailers(c *gin.Context) {
 		}
 	}
 
+	// Announce trailer keys up front (canonical form).
+	trailerKeys := make([]string, 0, len(c.Request.URL.Query()))
 	for k := range c.Request.URL.Query() {
-		c.Header("Tailer", k)
+		trailerKeys = append(trailerKeys, http.CanonicalHeaderKey(k))
+	}
+	if len(trailerKeys) > 0 {
+		c.Header("Trailer", strings.Join(trailerKeys, ", "))
 	}
 
 	h.RequestWithBody(c)
 	c.Writer.Flush()
 
-	for k, vs := range c.Request.Trailer {
-		for _, v := range vs {
-			c.Header(k, v)
+	// Set the actual trailers after the body has been written.
+	for k, vs := range c.Request.URL.Query() {
+		if len(vs) == 0 {
+			continue
 		}
+		c.Writer.Header().Set(http.CanonicalHeaderKey(k), vs[0])
 	}
 }
 

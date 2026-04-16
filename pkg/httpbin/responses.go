@@ -60,10 +60,10 @@ type bodyResponse struct {
 	Origin  string      `json:"origin"`
 	URL     string      `json:"url"`
 
-	Data  string     `json:"data"`
-	Files url.Values `json:"files"`
-	Form  url.Values `json:"form"`
-	JSON  any        `json:"json"`
+	Data  string              `json:"data"`
+	Files map[string][]string `json:"files"`
+	Form  url.Values          `json:"form"`
+	JSON  any                 `json:"json"`
 }
 
 type cookiesResponse struct {
@@ -130,7 +130,7 @@ func writeJSON(c *gin.Context, code int, v any) {
 
 func writeResponse(c *gin.Context, status int, contentType string, body []byte) {
 	c.Header("Content-Type", contentType)
-	c.JSON(status, body)
+	c.Data(status, contentType, body)
 }
 
 func writeHTML(c *gin.Context, status int, body []byte) {

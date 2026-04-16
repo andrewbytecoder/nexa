@@ -87,7 +87,7 @@ func (b *base64Helper) decode() ([]byte, error) {
 var safeContentTypes = map[string]bool{
 	"text/plain":               true,
 	"application/json":         true,
-	"application/octet-string": true,
+	"application/octet-stream": true,
 }
 
 // isDangerousContentType determines whether the given Content-Type header
@@ -120,7 +120,8 @@ func parseSeed(rawSeed string) (*rand.Rand, error) {
 
 func sha1hash(input string) string {
 	h := sha1.New()
-	return fmt.Sprintf("%x", h.Sum([]byte(input)))
+	_, _ = h.Write([]byte(input))
+	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
 func mustMarshalJSON(w io.Writer, val any) {
@@ -139,17 +140,28 @@ func mustMarshalJSON(w io.Writer, val any) {
 // headers are included, because golang only exposes those values on the
 // http.Request struct itself.
 func getRequestHeaders(c *gin.Context, fn headersProcessorFunc) http.Header {
-	c.Header("Host", c.Request.Host)
-	if r := c.Request; r != nil {
-		if len(r.TransferEncoding) > 0 {
-			c.Header("Transfer-Encoding", strings.Join(r.TransferEncoding, ","))
+	var headers http.Header
+	if c.Request != nil {
+		headers = c.Request.Header.Clone()
+	} else {
+		headers = make(http.Header)
+	}
+
+	// Include Host and Transfer-Encoding, which are not guaranteed to exist in
+	// Request.Header.
+	if c.Request != nil {
+		if c.Request.Host != "" {
+			headers.Set("Host", c.Request.Host)
+		}
+		if len(c.Request.TransferEncoding) > 0 {
+			headers.Set("Transfer-Encoding", strings.Join(c.Request.TransferEncoding, ","))
 		}
 	}
 
 	if fn != nil {
-		return fn(c.Request.Header)
+		return fn(headers)
 	}
-	return c.Request.Header
+	return headers
 }
 
 // parseDuration takes a user's input as a string and attempts to convert it
