@@ -1,7 +1,8 @@
 // Package cmdregister 提供命令注册功能，用于统一管理所有子命令
-package cmdregister
+package main
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/spf13/cobra"
@@ -25,8 +26,8 @@ func NewNexaCommand() *NexaCommand {
 		Use:   "nexa",
 		Short: "Nexa is a command line tool",
 		Long:  `Nexa is a command line tool for managing your nexa`,
-		// stop printing usage when the command errors
-		SilenceUsage: true,
+		// 自动运行补全逻辑
+		ValidArgsFunction: completeDefaultArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
@@ -35,6 +36,24 @@ func NewNexaCommand() *NexaCommand {
 		cmd:     cmd,
 		cmdList: []*cobra.Command{},
 	}
+}
+
+// 默认参数补全
+func completeDefaultArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	suggestions := []string{
+		"gops", "helmify", "httpbin", "httpstat", "kcpclient",
+		"help", "version", "kcpserver", "psutil",
+	}
+
+	// 过滤以 toComplete 开头的建议
+	filtered := make([]string, 0)
+	for _, s := range suggestions {
+		if strings.HasPrefix(s, toComplete) {
+			filtered = append(filtered, s)
+		}
+	}
+
+	return filtered, cobra.ShellCompDirectiveDefault
 }
 
 // GetNexaCommand 获取NexaCommand单例实例
