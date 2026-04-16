@@ -224,8 +224,9 @@ func (h *HttpBin) AddRouters() {
 	g.Any("/absolute-redirect/:numRedirects", h.AbsoluteRedirect)
 	g.Any("/anything", h.AnyThing)
 	g.Any("/anything/", h.AnyThing)
-	g.Any("/base64/:data", h.Base64)
-	g.Any("/base64/:operation/:data", h.Base64)
+	// Use a single catch-all route to avoid wildcard conflicts like:
+	// /base64/:data  vs  /base64/:operation/:data
+	g.Any("/base64/*path", h.Base64)
 	g.Any("/basic-auth/:user/:password", h.BasicAuth)
 	g.Any("/bearer", h.Bearer)
 	g.Any("/bytes/:numBytes", h.Bytes)

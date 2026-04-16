@@ -37,6 +37,11 @@ func (psProgress *PsProgress) ParseFlags(cmd *cobra.Command) {
 }
 
 func (psProgress *PsProgress) GetProcessInfo() {
+	// If a PID is specified, show details for that process.
+	if psProgress.pid > 0 {
+		psProgress.GetProcessInfoByPid()
+		return
+	}
 	if psProgress.showType == tAll || psProgress.showType == tProcess {
 		psProgress.showProgress()
 	}
@@ -50,7 +55,10 @@ func (psProgress *PsProgress) GetProcessInfoByPid() {
 
 	exists, err := process.PidExists(psProgress.pid)
 	if err != nil || !exists {
-		fmt.Printf("process %d not exists\n", psProgress.pid)
+		table := tablewriter.NewWriter(os.Stdout)
+		table.Header([]string{"Error"})
+		_ = table.Append([]string{fmt.Sprintf("process %d not exists", psProgress.pid)})
+		_ = table.Render()
 		return
 	}
 	processes, err := process.Processes()
@@ -67,10 +75,12 @@ func (psProgress *PsProgress) GetProcessInfoByPid() {
 	}
 
 	if lpProcess == nil {
-		fmt.Printf("process %d not exists\n", psProgress.pid)
+		table := tablewriter.NewWriter(os.Stdout)
+		table.Header([]string{"Error"})
+		_ = table.Append([]string{fmt.Sprintf("process %d not exists", psProgress.pid)})
+		_ = table.Render()
 		return
 	}
-	fmt.Println("--------------------------------- process with pid ------------------------------------")
 	times, err := lpProcess.Times()
 	if err != nil {
 		psProgress.psUtil.logger.Error(err.Error())
@@ -104,6 +114,7 @@ func (psProgress *PsProgress) GetProcessInfoByPid() {
 		psProgress.psUtil.logger.Error(err.Error())
 	}
 	printConnectionTable(connections)
+	printListeningPortsTable(connections)
 
 	files, err := lpProcess.OpenFiles()
 	if err != nil {
@@ -111,6 +122,27 @@ func (psProgress *PsProgress) GetProcessInfoByPid() {
 	}
 	printOpenFilesTable(files)
 
+}
+
+// printListeningPortsTable outputs a table of listening sockets for a process.
+func printListeningPortsTable(conns []net.ConnectionStat) {
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header([]string{"PROTO", "LOCAL", "STATUS"})
+
+	for _, c := range conns {
+		// Focus on listening sockets.
+		if strings.ToUpper(c.Status) != "LISTEN" {
+			continue
+		}
+		row := []string{
+			typeToString(c.Type),
+			formatAddr(c.Laddr),
+			c.Status,
+		}
+		table.Append(row)
+	}
+
+	table.Render()
 }
 
 // printOpenFilesTable 输出 []OpenFilesStat 表格
@@ -408,7 +440,7 @@ func formatInt(n int64) string {
 // printProcessTable 输出 []*Process 表格
 func (psProgress *PsProgress) printProcessTable(processes []*process.Process) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.Header([]string{"PID", "PPID", "Name", "Status", "Threads", "RSS(MB)", "VMS(MB)", "CPU User(s)", "Voluntary CS"})
+	table.Header([]string{"PID", "PPID", "Name", "Status", "Threads", "RSS(MB)", "VMS(MB)", "USER", "CMD", "Voluntary CS"})
 
 	for _, p := range processes {
 		name, _ := p.Name()
@@ -417,6 +449,12 @@ func (psProgress *PsProgress) printProcessTable(processes []*process.Process) {
 		numThreads, _ := p.NumThreads()
 		memInfo, _ := p.MemoryInfo()
 		userName, _ := p.Username()
+		cmdline, err := p.Cmdline()
+		if err != nil || strings.TrimSpace(cmdline) == "" {
+			if parts, err2 := p.CmdlineSlice(); err2 == nil && len(parts) > 0 {
+				cmdline = strings.Join(parts, " ")
+			}
+		}
 		numCtxSwitches, _ := p.NumCtxSwitches()
 		ppid, _ := p.Ppid()
 
@@ -429,17 +467,16 @@ func (psProgress *PsProgress) printProcessTable(processes []*process.Process) {
 			formatMB(memInfo.RSS),
 			formatMB(memInfo.VMS),
 			userName,
+			truncate(cmdline, 80),
 			formatInt(numCtxSwitches.Voluntary),
 		}
-		err := table.Append(row)
-		if err != nil {
+		if err := table.Append(row); err != nil {
 			psProgress.psUtil.logger.Error("table.Append", zap.Error(err))
 			return
 		}
 	}
 
-	err := table.Render()
-	if err != nil {
+	if err := table.Render(); err != nil {
 		psProgress.psUtil.logger.Error("table.Render", zap.Error(err))
 		return
 	}

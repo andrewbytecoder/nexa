@@ -33,16 +33,22 @@ type base64Helper struct {
 // - /base64/<base64_encoded_data>
 // - /base64/<operation>/<base64_encoded_data>
 func newBase64Helper(c *gin.Context, maxLen int64) *base64Helper {
-	b := &base64Helper{
-		operation: c.Param("operation"),
-		data:      c.Param("data"),
-		maxLen:    maxLen,
+	// Registered as /base64/*path, where path is:
+	//   - "/<data>" OR
+	//   - "/<operation>/<data>"
+	raw := strings.TrimPrefix(c.Param("path"), "/")
+	operation := "encode"
+	data := raw
+	if op, rest, found := strings.Cut(raw, "/"); found {
+		operation = op
+		data = rest
 	}
 
-	if b.operation == "" {
-		b.operation = "encode"
+	return &base64Helper{
+		operation: operation,
+		data:      data,
+		maxLen:    maxLen,
 	}
-	return b
 }
 
 func (b *base64Helper) transform() ([]byte, error) {

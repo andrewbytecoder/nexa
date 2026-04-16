@@ -9,6 +9,7 @@ services:
     restart: always
     # 启动命令参数 (对应 K8s 的 args)
     # 注意：docker-compose 中 command 覆盖镜像的 ENTRYPOINT/CMD
+    # httpbin --http-port=8080 --https-port=8443 --cert-path=/home/nexa/certs
     command:
       - "httpbin"
       - "--http-port=8080"

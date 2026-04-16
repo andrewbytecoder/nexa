@@ -2,11 +2,13 @@ package psutil
 
 import (
 	"fmt"
-	"log"
+	"os"
 	"strings"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 type PsMem struct {
@@ -48,69 +50,70 @@ func (psMem *PsMem) showMemInfo() {
 
 	v, err := mem.VirtualMemory()
 	if err != nil {
-		log.Fatal(err)
+		psMem.psUtil.logger.Error("mem.VirtualMemory", zap.Error(err))
 		return
 	}
 
-	fmt.Println("-----------------------------------------------------------------------")
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header([]string{"Metric", "Value"})
 	if psMem.readable {
-		fmt.Println("Free : " + HumanReadableBytesBinary(v.Free))
-		fmt.Println("Used : " + HumanReadableBytesBinary(v.Used))
-		fmt.Println("Total : " + HumanReadableBytesBinary(v.Total))
-		fmt.Println("UsedPercent : " + HumanReadableBytesBinary(uint64(v.UsedPercent)))
-		fmt.Println("CommittedAS : " + HumanReadableBytesBinary(v.CommittedAS))
-		fmt.Println("CommitLimit : " + HumanReadableBytesBinary(v.CommitLimit))
-		fmt.Println("VmallocTotal : " + HumanReadableBytesBinary(v.VmallocTotal))
-		fmt.Println("VmallocUsed : " + HumanReadableBytesBinary(v.VmallocUsed))
-		fmt.Println("VmallocChunk : " + HumanReadableBytesBinary(v.VmallocChunk))
-		fmt.Println("HighFree : " + HumanReadableBytesBinary(v.HighFree))
-		fmt.Println("HighTotal : " + HumanReadableBytesBinary(v.HighTotal))
-		fmt.Println("LowFree : " + HumanReadableBytesBinary(v.LowFree))
-		fmt.Println("LowTotal : " + HumanReadableBytesBinary(v.LowTotal))
-		fmt.Println("Mapped : " + HumanReadableBytesBinary(v.Mapped))
-		fmt.Println("Slab : " + HumanReadableBytesBinary(v.Slab))
-		fmt.Println("Sreclaimable : " + HumanReadableBytesBinary(v.Sreclaimable))
-		fmt.Println("Sunreclaim : " + HumanReadableBytesBinary(v.Sunreclaim))
-		fmt.Println("WriteBack : " + HumanReadableBytesBinary(v.WriteBack))
-		fmt.Println("WriteBackTmp : " + HumanReadableBytesBinary(v.WriteBackTmp))
-		fmt.Println("PageTables : " + HumanReadableBytesBinary(v.PageTables))
-		fmt.Println("Shared : " + HumanReadableBytesBinary(v.Shared))
-		fmt.Println("HugePagesFree : " + HumanReadableBytesBinary(v.HugePagesFree))
-		fmt.Println("HugePagesRsvd : " + HumanReadableBytesBinary(v.HugePagesRsvd))
-		fmt.Println("HugePagesSurp : " + HumanReadableBytesBinary(v.HugePagesSurp))
-		fmt.Println("HugePagesTotal : " + HumanReadableBytesBinary(v.HugePagesTotal))
-		fmt.Println("HugePageSize : " + HumanReadableBytesBinary(v.HugePageSize))
-		fmt.Println("AnonHugePages : " + HumanReadableBytesBinary(v.AnonHugePages))
+		_ = table.Append([]string{"Free", HumanReadableBytesBinary(v.Free)})
+		_ = table.Append([]string{"Used", HumanReadableBytesBinary(v.Used)})
+		_ = table.Append([]string{"Total", HumanReadableBytesBinary(v.Total)})
+		_ = table.Append([]string{"UsedPercent", fmt.Sprintf("%.2f%%", v.UsedPercent)})
+		_ = table.Append([]string{"CommittedAS", HumanReadableBytesBinary(v.CommittedAS)})
+		_ = table.Append([]string{"CommitLimit", HumanReadableBytesBinary(v.CommitLimit)})
+		_ = table.Append([]string{"VmallocTotal", HumanReadableBytesBinary(v.VmallocTotal)})
+		_ = table.Append([]string{"VmallocUsed", HumanReadableBytesBinary(v.VmallocUsed)})
+		_ = table.Append([]string{"VmallocChunk", HumanReadableBytesBinary(v.VmallocChunk)})
+		_ = table.Append([]string{"HighFree", HumanReadableBytesBinary(v.HighFree)})
+		_ = table.Append([]string{"HighTotal", HumanReadableBytesBinary(v.HighTotal)})
+		_ = table.Append([]string{"LowFree", HumanReadableBytesBinary(v.LowFree)})
+		_ = table.Append([]string{"LowTotal", HumanReadableBytesBinary(v.LowTotal)})
+		_ = table.Append([]string{"Mapped", HumanReadableBytesBinary(v.Mapped)})
+		_ = table.Append([]string{"Slab", HumanReadableBytesBinary(v.Slab)})
+		_ = table.Append([]string{"Sreclaimable", HumanReadableBytesBinary(v.Sreclaimable)})
+		_ = table.Append([]string{"Sunreclaim", HumanReadableBytesBinary(v.Sunreclaim)})
+		_ = table.Append([]string{"WriteBack", HumanReadableBytesBinary(v.WriteBack)})
+		_ = table.Append([]string{"WriteBackTmp", HumanReadableBytesBinary(v.WriteBackTmp)})
+		_ = table.Append([]string{"PageTables", HumanReadableBytesBinary(v.PageTables)})
+		_ = table.Append([]string{"Shared", HumanReadableBytesBinary(v.Shared)})
+		_ = table.Append([]string{"HugePagesFree", HumanReadableBytesBinary(v.HugePagesFree)})
+		_ = table.Append([]string{"HugePagesRsvd", HumanReadableBytesBinary(v.HugePagesRsvd)})
+		_ = table.Append([]string{"HugePagesSurp", HumanReadableBytesBinary(v.HugePagesSurp)})
+		_ = table.Append([]string{"HugePagesTotal", HumanReadableBytesBinary(v.HugePagesTotal)})
+		_ = table.Append([]string{"HugePageSize", HumanReadableBytesBinary(v.HugePageSize)})
+		_ = table.Append([]string{"AnonHugePages", HumanReadableBytesBinary(v.AnonHugePages)})
 	} else {
-
-		fmt.Println(fmt.Sprintf("Free : %d", v.Free))
-		fmt.Println(fmt.Sprintf("Used : %d", v.Used))
-		fmt.Println(fmt.Sprintf("Total : %d", v.Total))
-		fmt.Println(fmt.Sprintf("UsedPercent : %f", v.UsedPercent))
-		fmt.Println(fmt.Sprintf("CommittedAS : %d", v.CommittedAS))
-		fmt.Println(fmt.Sprintf("CommitLimit : %d", v.CommitLimit))
-		fmt.Println(fmt.Sprintf("VmallocTotal : %d", v.VmallocTotal))
-		fmt.Println(fmt.Sprintf("VmallocUsed : %d", v.VmallocUsed))
-		fmt.Println(fmt.Sprintf("VmallocChunk : %d", v.VmallocChunk))
-		fmt.Println(fmt.Sprintf("HighFree : %d", v.HighFree))
-		fmt.Println(fmt.Sprintf("HighTotal : %d", v.HighTotal))
-		fmt.Println(fmt.Sprintf("LowFree : %d", v.LowFree))
-		fmt.Println(fmt.Sprintf("LowTotal : %d", v.LowTotal))
-		fmt.Println(fmt.Sprintf("Mapped : %d", v.Mapped))
-		fmt.Println(fmt.Sprintf("Slab : %d", v.Slab))
-		fmt.Println(fmt.Sprintf("Sreclaimable : %d", v.Sreclaimable))
-		fmt.Println(fmt.Sprintf("Sunreclaim : %d", v.Sunreclaim))
-		fmt.Println(fmt.Sprintf("WriteBack : %d", v.WriteBack))
-		fmt.Println(fmt.Sprintf("WriteBackTmp : %d", v.WriteBackTmp))
-		fmt.Println(fmt.Sprintf("PageTables : %d", v.PageTables))
-		fmt.Println(fmt.Sprintf("Shared : %d", v.Shared))
-		fmt.Println(fmt.Sprintf("HugePagesFree : %d", v.HugePagesFree))
-		fmt.Println(fmt.Sprintf("HugePagesRsvd : %d", v.HugePagesRsvd))
-		fmt.Println(fmt.Sprintf("HugePagesSurp : %d", v.HugePagesSurp))
-		fmt.Println(fmt.Sprintf("HugePagesTotal : %d", v.HugePagesTotal))
-		fmt.Println(fmt.Sprintf("HugePageSize : %d", v.HugePageSize))
-		fmt.Println(fmt.Sprintf("AnonHugePages : %d", v.AnonHugePages))
+		_ = table.Append([]string{"Free", fmt.Sprintf("%d", v.Free)})
+		_ = table.Append([]string{"Used", fmt.Sprintf("%d", v.Used)})
+		_ = table.Append([]string{"Total", fmt.Sprintf("%d", v.Total)})
+		_ = table.Append([]string{"UsedPercent", fmt.Sprintf("%.2f%%", v.UsedPercent)})
+		_ = table.Append([]string{"CommittedAS", fmt.Sprintf("%d", v.CommittedAS)})
+		_ = table.Append([]string{"CommitLimit", fmt.Sprintf("%d", v.CommitLimit)})
+		_ = table.Append([]string{"VmallocTotal", fmt.Sprintf("%d", v.VmallocTotal)})
+		_ = table.Append([]string{"VmallocUsed", fmt.Sprintf("%d", v.VmallocUsed)})
+		_ = table.Append([]string{"VmallocChunk", fmt.Sprintf("%d", v.VmallocChunk)})
+		_ = table.Append([]string{"HighFree", fmt.Sprintf("%d", v.HighFree)})
+		_ = table.Append([]string{"HighTotal", fmt.Sprintf("%d", v.HighTotal)})
+		_ = table.Append([]string{"LowFree", fmt.Sprintf("%d", v.LowFree)})
+		_ = table.Append([]string{"LowTotal", fmt.Sprintf("%d", v.LowTotal)})
+		_ = table.Append([]string{"Mapped", fmt.Sprintf("%d", v.Mapped)})
+		_ = table.Append([]string{"Slab", fmt.Sprintf("%d", v.Slab)})
+		_ = table.Append([]string{"Sreclaimable", fmt.Sprintf("%d", v.Sreclaimable)})
+		_ = table.Append([]string{"Sunreclaim", fmt.Sprintf("%d", v.Sunreclaim)})
+		_ = table.Append([]string{"WriteBack", fmt.Sprintf("%d", v.WriteBack)})
+		_ = table.Append([]string{"WriteBackTmp", fmt.Sprintf("%d", v.WriteBackTmp)})
+		_ = table.Append([]string{"PageTables", fmt.Sprintf("%d", v.PageTables)})
+		_ = table.Append([]string{"Shared", fmt.Sprintf("%d", v.Shared)})
+		_ = table.Append([]string{"HugePagesFree", fmt.Sprintf("%d", v.HugePagesFree)})
+		_ = table.Append([]string{"HugePagesRsvd", fmt.Sprintf("%d", v.HugePagesRsvd)})
+		_ = table.Append([]string{"HugePagesSurp", fmt.Sprintf("%d", v.HugePagesSurp)})
+		_ = table.Append([]string{"HugePagesTotal", fmt.Sprintf("%d", v.HugePagesTotal)})
+		_ = table.Append([]string{"HugePageSize", fmt.Sprintf("%d", v.HugePageSize)})
+		_ = table.Append([]string{"AnonHugePages", fmt.Sprintf("%d", v.AnonHugePages)})
 	}
+	_ = table.Render()
 }
 
 // HumanReadableBytesBinary 使用二进制单位（GiB, MiB）
@@ -127,55 +130,56 @@ func HumanReadableBytesBinary(bytes uint64) string {
 }
 
 func (psMem *PsMem) showSwapDevInfo() {
-	fmt.Println("-----------------------------------------------------------------------")
 	s, err := mem.SwapDevices()
 	if err != nil {
-		log.Fatal(err)
+		psMem.psUtil.logger.Error("mem.SwapDevices", zap.Error(err))
 		return
 	}
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header([]string{"Device", "Total", "Used"})
 	for _, v := range s {
 		if psMem.readable {
-			fmt.Println(fmt.Sprintf("Device : %s", v.Name))
-			fmt.Println(fmt.Sprintf("Total : %s", HumanReadableBytesBinary(v.UsedBytes)))
-			fmt.Println(fmt.Sprintf("Used : %s", HumanReadableBytesBinary(v.UsedBytes)))
+			_ = table.Append([]string{
+				v.Name,
+				HumanReadableBytesBinary(v.UsedBytes),
+				HumanReadableBytesBinary(v.UsedBytes),
+			})
 		} else {
-			fmt.Println(fmt.Sprintf("Device : %s", v.Name))
-			fmt.Println(fmt.Sprintf("Total : %d", v.UsedBytes))
-			fmt.Println(fmt.Sprintf("Used : %d", v.UsedBytes))
+			_ = table.Append([]string{
+				v.Name,
+				fmt.Sprintf("%d", v.UsedBytes),
+				fmt.Sprintf("%d", v.UsedBytes),
+			})
 		}
 	}
+	_ = table.Render()
 
 }
 
 func (psMem *PsMem) showSwapInfo() {
-	fmt.Println("-----------------------------------------------------------------------")
 	s, err := mem.SwapMemory()
 	if err != nil {
-		log.Fatal(err)
+		psMem.psUtil.logger.Error("mem.SwapMemory", zap.Error(err))
 		return
 	}
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header([]string{"Metric", "Value"})
 	if psMem.readable {
-		fmt.Println(fmt.Sprintf("Total : %s", HumanReadableBytesBinary(s.Total)))
-		fmt.Println(fmt.Sprintf("Used : %s", HumanReadableBytesBinary(s.Used)))
-		fmt.Println(fmt.Sprintf("Free : %s", HumanReadableBytesBinary(s.Free)))
-		fmt.Println(fmt.Sprintf("UsedPercent : %f", s.UsedPercent))
-		fmt.Println(fmt.Sprintf("Sin : %d", s.Sin))
-		fmt.Println(fmt.Sprintf("Sout : %d", s.Sout))
-		fmt.Println(fmt.Sprintf("PgIn : %d", s.PgIn))
-		fmt.Println(fmt.Sprintf("PgOut : %d", s.PgOut))
-		fmt.Println(fmt.Sprintf("PgFault : %d", s.PgFault))
-		fmt.Println(fmt.Sprintf("PgMajFault : %d", s.PgMajFault))
+		_ = table.Append([]string{"Total", HumanReadableBytesBinary(s.Total)})
+		_ = table.Append([]string{"Used", HumanReadableBytesBinary(s.Used)})
+		_ = table.Append([]string{"Free", HumanReadableBytesBinary(s.Free)})
 	} else {
-		fmt.Println(fmt.Sprintf("Total : %d", s.Total))
-		fmt.Println(fmt.Sprintf("Used : %d", s.Used))
-		fmt.Println(fmt.Sprintf("Free : %d", s.Free))
-		fmt.Println(fmt.Sprintf("UsedPercent : %f", s.UsedPercent))
-		fmt.Println(fmt.Sprintf("Sin : %d", s.Sin))
-		fmt.Println(fmt.Sprintf("Sout : %d", s.Sout))
-		fmt.Println(fmt.Sprintf("PgIn : %d", s.PgIn))
-		fmt.Println(fmt.Sprintf("PgOut : %d", s.PgOut))
-		fmt.Println(fmt.Sprintf("PgFault : %d", s.PgFault))
-		fmt.Println(fmt.Sprintf("PgMajFault : %d", s.PgMajFault))
+		_ = table.Append([]string{"Total", fmt.Sprintf("%d", s.Total)})
+		_ = table.Append([]string{"Used", fmt.Sprintf("%d", s.Used)})
+		_ = table.Append([]string{"Free", fmt.Sprintf("%d", s.Free)})
 	}
+	_ = table.Append([]string{"UsedPercent", fmt.Sprintf("%.2f%%", s.UsedPercent)})
+	_ = table.Append([]string{"Sin", fmt.Sprintf("%d", s.Sin)})
+	_ = table.Append([]string{"Sout", fmt.Sprintf("%d", s.Sout)})
+	_ = table.Append([]string{"PgIn", fmt.Sprintf("%d", s.PgIn)})
+	_ = table.Append([]string{"PgOut", fmt.Sprintf("%d", s.PgOut)})
+	_ = table.Append([]string{"PgFault", fmt.Sprintf("%d", s.PgFault)})
+	_ = table.Append([]string{"PgMajFault", fmt.Sprintf("%d", s.PgMajFault)})
+	_ = table.Render()
 
 }

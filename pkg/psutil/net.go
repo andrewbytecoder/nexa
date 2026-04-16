@@ -73,7 +73,12 @@ func (psNet *PsNet) showNetPids() {
 		psNet.psUtil.logger.Error("Error getting network info", zap.Error(err))
 		return
 	}
-	fmt.Printf("PIDs: %v\n", pids)
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header([]string{"PID"})
+	for _, pid := range pids {
+		_ = table.Append([]string{fmt.Sprintf("%d", pid)})
+	}
+	_ = table.Render()
 }
 
 func (psNet *PsNet) showNetConntrack() {

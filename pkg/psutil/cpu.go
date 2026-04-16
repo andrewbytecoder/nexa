@@ -6,9 +6,9 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"text/tabwriter"
 	"time"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -67,9 +67,16 @@ func (psCpu *PsCpu) showCpuPercent() {
 		psCpu.psUtil.logger.Error("unable to get cpu times", zap.Error(err))
 		return
 	}
-
-	fmt.Println("cpu percent:", percents)
-	fmt.Println("------------------------------------------")
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header([]string{"CPU", "Percent"})
+	if psCpu.perCpu {
+		for i, p := range percents {
+			_ = table.Append([]string{fmt.Sprintf("cpu%d", i), fmt.Sprintf("%.2f%%", p)})
+		}
+	} else if len(percents) > 0 {
+		_ = table.Append([]string{"total", fmt.Sprintf("%.2f%%", percents[0])})
+	}
+	_ = table.Render()
 
 	// 采样间隔 1 秒
 	timesPercent, err := getCPUPercent(1 * time.Second)
@@ -93,100 +100,52 @@ func (psCpu *PsCpu) showCpuInfo() {
 
 // printCPUSummary 将 []TimesStat 格式化输出为表格
 func printCPUSummary(stats []cpu.TimesStat) {
-	w := tabwriter.NewWriter(os.Stdout, 10, 4, 3, ' ', 0)
-
-	// 表头
-	_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		"CPU", "User", "System", "Idle", "Iowait", "Irq", "Softirq", "Steal", "Guest", "GuestNice", "Nice")
-
-	// 分隔线（可选）
-	_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		"-----", "------", "--------", "--------", "--------", "---", "---------", "-------", "-------", "-----------", "----")
-
-	// 数据行
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header([]string{"CPU", "User", "System", "Idle", "Iowait", "Irq", "Softirq", "Steal", "Guest", "GuestNice", "Nice"})
 	for _, s := range stats {
-		_, _ = fmt.Fprintf(w, "%s\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n",
+		_ = table.Append([]string{
 			s.CPU,
-			s.User,
-			s.System,
-			s.Idle,
-			s.Iowait,
-			s.Irq,
-			s.Softirq,
-			s.Steal,
-			s.Guest,
-			s.GuestNice,
-			s.Nice,
-		)
+			fmt.Sprintf("%.2f", s.User),
+			fmt.Sprintf("%.2f", s.System),
+			fmt.Sprintf("%.2f", s.Idle),
+			fmt.Sprintf("%.2f", s.Iowait),
+			fmt.Sprintf("%.2f", s.Irq),
+			fmt.Sprintf("%.2f", s.Softirq),
+			fmt.Sprintf("%.2f", s.Steal),
+			fmt.Sprintf("%.2f", s.Guest),
+			fmt.Sprintf("%.2f", s.GuestNice),
+			fmt.Sprintf("%.2f", s.Nice),
+		})
 	}
-
-	// 刷新输出
-	_ = w.Flush()
+	_ = table.Render()
 }
 
 // printCPUInfoTable 美观输出 CPU 信息表格
 func printCPUInfoTable(info []cpu.InfoStat) {
-	// 使用空格作为分隔符，配合固定宽度控制对齐
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight|tabwriter.Debug)
-
-	// 自定义列宽格式（可根据实际数据调整）
-	const (
-		colCPU        = "%-2d"
-		colVendorID   = "%-12s"
-		colFamily     = "%-6s"
-		colModel      = "%-5s"
-		colStepping   = "%-9d"
-		colPhysicalID = "%-11s"
-		colCoreID     = "%-8s"
-		colCores      = "%-8d"
-		colModelName  = "%-38s"
-		colMhz        = "%-10.2f"
-		colCacheSize  = "%-10d"
-		colFlags      = "%-22s"
-		colMicrocode  = "%-10s"
-	)
-
-	// 表头
-	_, _ = fmt.Fprintf(w, colCPU+"\t"+colVendorID+"\t"+colFamily+"\t"+colModel+"\t"+
-		colStepping+"\t"+colPhysicalID+"\t"+colCoreID+"\t"+colCores+"\t"+
-		colModelName+"\t"+colMhz+"\t"+colCacheSize+"\t"+colFlags+"\t"+colMicrocode+"\n",
-		"CPU", "VendorID", "Family", "Model", "Stepping", "PhysicalID",
-		"CoreID", "Cores", "ModelName", "Mhz", "CacheSize", "Flags", "Microcode")
-
-	// 分隔线（对齐表头）
-	_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		"----", "------------", "------", "-----", "---------", "-----------",
-		"--------", "--------", "--------------------------------------", "----------",
-		"----------", "----------------------", "----------")
-
-	// 数据行
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header([]string{"CPU", "VendorID", "Family", "Model", "Stepping", "PhysicalID", "CoreID", "Cores", "ModelName", "Mhz", "CacheSize", "Flags", "Microcode"})
 	for _, lCpu := range info {
 		flags := strings.Join(lCpu.Flags, ",")
 		if len(flags) > 22 {
 			flags = flags[:19] + "..."
 		}
-
-		_, _ = fmt.Fprintf(w,
-			colCPU+"\t"+colVendorID+"\t"+colFamily+"\t"+colModel+"\t"+
-				colStepping+"\t"+colPhysicalID+"\t"+colCoreID+"\t"+colCores+"\t"+
-				colModelName+"\t"+colMhz+"\t"+colCacheSize+"\t"+colFlags+"\t"+colMicrocode+"\n",
-			lCpu.CPU,
+		_ = table.Append([]string{
+			fmt.Sprintf("%d", lCpu.CPU),
 			lCpu.VendorID,
 			lCpu.Family,
 			lCpu.Model,
-			lCpu.Stepping,
+			fmt.Sprintf("%d", lCpu.Stepping),
 			lCpu.PhysicalID,
 			lCpu.CoreID,
-			lCpu.Cores,
+			fmt.Sprintf("%d", lCpu.Cores),
 			lCpu.ModelName,
-			lCpu.Mhz,
-			lCpu.CacheSize,
+			fmt.Sprintf("%.2f", lCpu.Mhz),
+			fmt.Sprintf("%d", lCpu.CacheSize),
 			flags,
 			lCpu.Microcode,
-		)
+		})
 	}
-
-	_ = w.Flush()
+	_ = table.Render()
 }
 
 type CPUPercentStat struct {
@@ -273,29 +232,22 @@ func getCPUPercent(interval time.Duration) ([]CPUPercentStat, error) {
 
 // printCPUPercentTable 输出表格
 func printCPUPercentTable(stats []CPUPercentStat) {
-	w := tabwriter.NewWriter(os.Stdout, 10, 4, 3, ' ', 0)
-
-	_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		"CPU", "User", "System", "Idle", "Nice", "Iowait", "Irq", "Softirq", "Steal", "Guest", "Total%")
-
-	_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		"-----", "------", "--------", "--------", "--------", "--------", "---", "---------", "-------", "-------", "-------")
-
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header([]string{"CPU", "User", "System", "Idle", "Nice", "Iowait", "Irq", "Softirq", "Steal", "Guest", "Total%"})
 	for _, s := range stats {
-		_, _ = fmt.Fprintf(w, "%s\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%\n",
+		_ = table.Append([]string{
 			s.CPU,
-			s.User,
-			s.System,
-			s.Idle,
-			s.Nice,
-			s.Iowait,
-			s.Irq,
-			s.Softirq,
-			s.Steal,
-			s.Guest,
-			s.Total,
-		)
+			fmt.Sprintf("%.2f%%", s.User),
+			fmt.Sprintf("%.2f%%", s.System),
+			fmt.Sprintf("%.2f%%", s.Idle),
+			fmt.Sprintf("%.2f%%", s.Nice),
+			fmt.Sprintf("%.2f%%", s.Iowait),
+			fmt.Sprintf("%.2f%%", s.Irq),
+			fmt.Sprintf("%.2f%%", s.Softirq),
+			fmt.Sprintf("%.2f%%", s.Steal),
+			fmt.Sprintf("%.2f%%", s.Guest),
+			fmt.Sprintf("%.2f%%", s.Total),
+		})
 	}
-
-	_ = w.Flush()
+	_ = table.Render()
 }

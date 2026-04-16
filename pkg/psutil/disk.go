@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/shirou/gopsutil/v4/disk"
@@ -217,35 +216,21 @@ func humanInodes(n uint64) string {
 
 // printDiskUsageTable 输出单个路径的磁盘使用情况表格
 func printDiskUsageTable(mapUsage map[string]*disk.UsageStat) error {
-
-	// 使用 tabwriter 实现对齐
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-
-	// 表头
-	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		"Filesystem", "Type", "Size", "Used", "Avail", "Use%", "Inodes", "IUse%", "Mounted on")
-
-	// 分隔线
-	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		strings.Repeat("-", 10), strings.Repeat("-", 8), strings.Repeat("-", 6),
-		strings.Repeat("-", 6), strings.Repeat("-", 6), strings.Repeat("-", 5),
-		strings.Repeat("-", 8), strings.Repeat("-", 6), strings.Repeat("-", 12))
-
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header([]string{"Filesystem", "Type", "Size", "Used", "Avail", "Use%", "Inodes", "IUse%", "Mounted on"})
 	for mountOn, usage := range mapUsage {
-		// 数据行
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%.1f%%\t%s\t%.1f%%\t%s\n",
-			usage.Fstype,                   // Filesystem（实际应为设备名，但 gopsutil 不直接提供）
-			usage.Fstype,                   // Type（文件系统类型）
-			humanSize(usage.Total),         // Size
-			humanSize(usage.Used),          // Used
-			humanSize(usage.Free),          // Avail
-			usage.UsedPercent,              // Use%
-			humanInodes(usage.InodesTotal), // Inodes
-			usage.InodesUsedPercent,        // IUse%
-			mountOn,                        // IUse%
-		)
+		_ = table.Append([]string{
+			usage.Fstype, // Filesystem（实际应为设备名，但 gopsutil 不直接提供）
+			usage.Fstype, // Type（文件系统类型）
+			humanSize(usage.Total),
+			humanSize(usage.Used),
+			humanSize(usage.Free),
+			fmt.Sprintf("%.1f%%", usage.UsedPercent),
+			humanInodes(usage.InodesTotal),
+			fmt.Sprintf("%.1f%%", usage.InodesUsedPercent),
+			mountOn,
+		})
 	}
-
-	w.Flush()
+	_ = table.Render()
 	return nil
 }
