@@ -6,6 +6,7 @@ import (
 	"github.com/nexa/cmd/nexa/gops"
 	"github.com/nexa/cmd/nexa/helmify"
 	"github.com/nexa/cmd/nexa/net"
+	"github.com/nexa/cmd/nexa/node"
 	"github.com/nexa/cmd/nexa/psutil"
 	"github.com/nexa/cmd/nexa/udp"
 	"github.com/nexa/cmd/nexa/version"
@@ -19,6 +20,7 @@ func main() {
 	cmdRegister.
 		// 注册http请求命令
 		AddCommand(net.Cmd(cCtx)).
+		AddCommand(node.Cmd(cCtx)).
 		AddCommand(psutil.GetPsUtilCmd(cCtx)).
 		AddCommand(gops.GetGoPsCmd(cCtx)).
 		AddCommand(version.GetVersionCmd(cCtx)).
