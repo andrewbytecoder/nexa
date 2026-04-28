@@ -7,6 +7,7 @@ import (
 	"github.com/nexa/cmd/nexa/helmify"
 	"github.com/nexa/cmd/nexa/net"
 	"github.com/nexa/cmd/nexa/node"
+	"github.com/nexa/cmd/nexa/prometheus"
 	"github.com/nexa/cmd/nexa/psutil"
 	"github.com/nexa/cmd/nexa/udp"
 	"github.com/nexa/cmd/nexa/version"
@@ -25,7 +26,8 @@ func main() {
 		AddCommand(gops.GetGoPsCmd(cCtx)).
 		AddCommand(version.GetVersionCmd(cCtx)).
 		AddCommand(udp.GetCmd(cCtx)).
-		AddCommand(helmify.GetCmd(cCtx))
+		AddCommand(helmify.GetCmd(cCtx)).
+		AddCommand(prometheus.Cmd(cCtx))
 	if err := cmdRegister.Execute(); err != nil {
 		fmt.Println(err)
 	}

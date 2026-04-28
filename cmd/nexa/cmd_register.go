@@ -42,7 +42,7 @@ func NewNexaCommand() *NexaCommand {
 func completeDefaultArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	suggestions := []string{
 		"gops", "helmify", "httpbin", "httpstat", "kcpclient",
-		"help", "version", "kcpserver", "psutil",
+		"help", "version", "kcpserver", "psutil", "prometheus",
 	}
 
 	// 过滤以 toComplete 开头的建议
