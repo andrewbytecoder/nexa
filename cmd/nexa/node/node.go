@@ -18,6 +18,7 @@ type nodeRenderFlags struct {
 	samples bool
 	limit   int
 	human   bool
+	output  string
 }
 
 type nodeCollectorFlags struct {
@@ -53,8 +54,8 @@ func Cmd(cctx *ctx.Ctx) []*cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:          "node",
-		Short:        "node metrics collectors (node_exporter-like)",
-		Long:         "Collect node (machine) metrics with pluggable collectors and render as tables.",
+		Short:        "collect and display node (machine) metrics",
+		Long:         "Collect node (machine) metrics with pluggable collectors and render for terminal use.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runtime.GOOS != "linux" {
@@ -81,7 +82,7 @@ func Cmd(cctx *ctx.Ctx) []*cobra.Command {
 					return err
 				}
 				sort.Slice(families, func(i, j int) bool { return families[i].Name < families[j].Name })
-				return render.PrintMetricFamilies(os.Stdout, families, render.Options{ShowSamples: rf.samples, Limit: rf.limit, Humanize: rf.human})
+				return render.PrintMetricFamilies(os.Stdout, families, render.Options{ShowSamples: rf.samples, Limit: rf.limit, Humanize: rf.human, Output: rf.output})
 			}
 
 			// `nexa node --collect ...` or `nexa node --exclude ...`
@@ -96,6 +97,7 @@ func Cmd(cctx *ctx.Ctx) []*cobra.Command {
 	cmd.PersistentFlags().BoolVar(&rf.samples, "samples", false, "print per-sample time series rows")
 	cmd.PersistentFlags().IntVar(&rf.limit, "limit", 2000, "max output rows in --samples mode (protects console)")
 	cmd.PersistentFlags().BoolVar(&rf.human, "human-readable", true, "human readable output (bytes, seconds, big integers)")
+	cmd.PersistentFlags().StringVar(&rf.output, "output", "plain", "output format: plain, table, prom")
 	cmd.PersistentFlags().StringArrayVar(&collectOnly, "collect", nil, "collect only these collectors (repeatable; mutual exclusive with --exclude)")
 	cmd.PersistentFlags().StringArrayVar(&exclude, "exclude", nil, "exclude these collectors (repeatable; mutual exclusive with --collect)")
 	cmd.PersistentFlags().BoolVar(&cf.disableDefaults, "collector.disable-defaults", false, "disable all collectors by default (enable explicitly with --collector.<name>)")
@@ -138,6 +140,9 @@ func listCmd(reg *nodecollector.Registry) *cobra.Command {
 			rows := make([]nodecollector.CollectorStatus, 0, len(names))
 			for _, name := range names {
 				rows = append(rows, reg.Status(name))
+			}
+			if out, _ := cmd.Flags().GetString("output"); out == "plain" || out == "" {
+				return render.PrintCollectorListPlain(os.Stdout, rows)
 			}
 			return render.PrintCollectorList(os.Stdout, rows)
 		},
@@ -211,7 +216,7 @@ func allCmd(reg *nodecollector.Registry, rf *nodeRenderFlags, collectOnly *[]str
 
 			sort.Slice(families, func(i, j int) bool { return families[i].Name < families[j].Name })
 
-			if err := render.PrintMetricFamilies(os.Stdout, families, render.Options{ShowSamples: rf.samples, Limit: rf.limit, Humanize: rf.human}); err != nil {
+			if err := render.PrintMetricFamilies(os.Stdout, families, render.Options{ShowSamples: rf.samples, Limit: rf.limit, Humanize: rf.human, Output: rf.output}); err != nil {
 				return err
 			}
 
