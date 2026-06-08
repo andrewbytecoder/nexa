@@ -2,6 +2,7 @@ package gops
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/nexa/pkg/ctx"
 	"github.com/nexa/pkg/gops"
@@ -20,9 +21,10 @@ func newCmd(ctx *ctx.Ctx) *cobra.Command {
 	psCmd := gops.NewGoPs(ctx)
 
 	cmd := &cobra.Command{
-		Use:   "gops",
-		Short: "gops is a tool to list and diagnose Go processes.",
-		Long:  `nexa gops [command].`,
+		Use:               "gops",
+		Short:             "gops is a tool to list and diagnose Go processes.",
+		Long:              `nexa gops [command].`,
+		ValidArgsFunction: completeGopsSubcommands,
 		Example: `nexa gops <register> <pid|addr> ...
 		gops <pid> # displays process info
 		gops help  # displays this help message`,
@@ -61,4 +63,17 @@ func addSubCmd(psUtil *gops.PsCmd, cmd *cobra.Command) {
 	cmd.AddCommand(ProcessCommand())
 	cmd.AddCommand(TreeCommand())
 	cmd.AddCommand(AgentCommands()...)
+}
+
+// --- 自动补全 ---
+
+func completeGopsSubcommands(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	subcommands := []string{"process", "tree", "stack", "gc", "setgc", "memstats", "stats", "trace", "pprof-heap", "pprof-cpu", "version"}
+	var result []string
+	for _, s := range subcommands {
+		if strings.HasPrefix(s, toComplete) {
+			result = append(result, s)
+		}
+	}
+	return result, cobra.ShellCompDirectiveNoFileComp
 }

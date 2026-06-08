@@ -18,6 +18,12 @@ func newCmdHttpStat(ctx *ctx.Ctx) *cobra.Command {
 		Example: `nexa httpstat www.google.com -X GET -H "Accept: application/json, text/plain, */*"`,
 		// stop printing usage when the command errors
 		SilenceUsage: true,
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) >= 1 {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			return nil, cobra.ShellCompDirectiveDefault
+		},
 	}
 	cmd.Run = func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nexa/cmd/nexa/complete"
 	"github.com/nexa/pkg/ctx"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -44,9 +45,10 @@ func Cmd(cctx *ctx.Ctx) []*cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:          "prometheus",
-		Short:        "discover Prometheus in a namespace and query metrics",
-		SilenceUsage: true,
+		Use:               "prometheus",
+		Short:             "discover Prometheus in a namespace and query metrics",
+		ValidArgsFunction: completePromSubcommands,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
@@ -98,6 +100,7 @@ func Cmd(cctx *ctx.Ctx) []*cobra.Command {
 
 	cmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "default", "namespace to discover Prometheus in")
 	cmd.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", "", "path to kubeconfig (optional; defaults to in-cluster or ~/.kube/config)")
+	cmd.RegisterFlagCompletionFunc("kubeconfig", complete.File)
 
 	queryCmd.Flags().StringVar(&query, "query", "up==1", "PromQL query to execute (instant query)")
 	queryCmd.Flags().StringVar(&address, "address", "", "Prometheus base URL, e.g. http://10.247.96.18:9090 (skip discovery)")
@@ -163,6 +166,7 @@ func Cmd(cctx *ctx.Ctx) []*cobra.Command {
 		},
 	}
 	monitorCmd.Flags().BoolVarP(&allNamespaces, "all-namespaces", "A", false, "list across all namespaces")
+	monitorCmd.RegisterFlagCompletionFunc("all-namespaces", complete.Bool)
 	cmd.AddCommand(monitorCmd)
 
 	listCmd := &cobra.Command{
@@ -1302,4 +1306,10 @@ func listUnstructured(ctx context.Context, dyn dynamic.Interface, namespace stri
 		return nil, err
 	}
 	return list.Items, nil
+}
+
+// --- 自动补全辅助函数 ---
+
+func completePromSubcommands(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return complete.Values([]string{"query", "monitor", "list", "targets"}, toComplete)
 }

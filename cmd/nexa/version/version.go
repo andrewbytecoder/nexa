@@ -1,6 +1,7 @@
 package version
 
 import (
+	"github.com/nexa/cmd/nexa/complete"
 	"github.com/nexa/pkg/ctx"
 	"github.com/spf13/cobra"
 )
@@ -27,5 +28,6 @@ func newCmdVersion() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&client, "client", true, "If true, shows client version only (no server required).")
+	cmd.RegisterFlagCompletionFunc("client", complete.Bool)
 	return cmd
 }

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nexa/cmd/nexa/complete"
 	"github.com/nexa/pkg/ctx"
 	nodecollector "github.com/nexa/pkg/node/collector"
 	"github.com/nexa/pkg/node/render"
@@ -98,6 +99,23 @@ func Cmd(cctx *ctx.Ctx) []*cobra.Command {
 	cmd.PersistentFlags().IntVar(&rf.limit, "limit", 2000, "max output rows in --samples mode (protects console)")
 	cmd.PersistentFlags().BoolVar(&rf.human, "human-readable", true, "human readable output (bytes, seconds, big integers)")
 	cmd.PersistentFlags().StringVar(&rf.output, "output", "plain", "output format: plain, table, prom")
+	cmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return complete.Values([]string{"plain", "table", "prom"}, toComplete)
+	})
+	cmd.RegisterFlagCompletionFunc("human-readable", complete.Bool)
+
+	// 位置参数补全：collector 名称列表
+	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		names := reg.Names()
+		sort.Strings(names)
+		var result []string
+		for _, n := range names {
+			if strings.HasPrefix(n, toComplete) {
+				result = append(result, n)
+			}
+		}
+		return result, cobra.ShellCompDirectiveNoFileComp
+	}
 	cmd.PersistentFlags().StringArrayVar(&collectOnly, "collect", nil, "collect only these collectors (repeatable; mutual exclusive with --exclude)")
 	cmd.PersistentFlags().StringArrayVar(&exclude, "exclude", nil, "exclude these collectors (repeatable; mutual exclusive with --collect)")
 	cmd.PersistentFlags().BoolVar(&cf.disableDefaults, "collector.disable-defaults", false, "disable all collectors by default (enable explicitly with --collector.<name>)")
@@ -394,4 +412,3 @@ func labelValue(labels []nodecollector.Label, key string) string {
 	}
 	return ""
 }
-

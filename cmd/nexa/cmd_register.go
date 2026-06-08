@@ -2,16 +2,15 @@
 package main
 
 import (
-	"strings"
 	"sync"
 
+	"github.com/nexa/cmd/nexa/complete"
 	"github.com/spf13/cobra"
 )
 
 // NexaCommand 结构体用于封装主命令及其所有子命令
 type NexaCommand struct {
-	cmd     *cobra.Command
-	cmdList []*cobra.Command
+	cmd *cobra.Command
 }
 
 // 全局变量，用于实现单例模式
@@ -26,34 +25,15 @@ func NewNexaCommand() *NexaCommand {
 		Use:   "nexa",
 		Short: "Nexa is a command line tool",
 		Long:  `Nexa is a command line tool for managing your nexa`,
-		// 自动运行补全逻辑
-		ValidArgsFunction: completeDefaultArgs,
+		// 自动运行补全逻辑（需先执行 source <(nexa completion bash) 激活）
+		ValidArgsFunction: complete.SubcommandNames,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
 	}
 	return &NexaCommand{
-		cmd:     cmd,
-		cmdList: []*cobra.Command{},
+		cmd: cmd,
 	}
-}
-
-// 默认参数补全
-func completeDefaultArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	suggestions := []string{
-		"gops", "helmify", "httpbin", "httpstat", "kcpclient",
-		"help", "version", "kcpserver", "psutil", "prometheus",
-	}
-
-	// 过滤以 toComplete 开头的建议
-	filtered := make([]string, 0)
-	for _, s := range suggestions {
-		if strings.HasPrefix(s, toComplete) {
-			filtered = append(filtered, s)
-		}
-	}
-
-	return filtered, cobra.ShellCompDirectiveDefault
 }
 
 // GetNexaCommand 获取NexaCommand单例实例
