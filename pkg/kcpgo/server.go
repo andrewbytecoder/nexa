@@ -34,7 +34,6 @@ func (k *Kcp) ParseFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&k.Addr, "addr", "a", "0.0.0.0", "udp addr")
 	cmd.Flags().IntVarP(&k.RequestInterval, "interval", "i", 1000, "request interval")
 	cmd.Flags().StringVarP(&k.SendData, "body", "b", "", "send data")
-
 }
 
 func (k *Kcp) StartServer() {
